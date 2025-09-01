@@ -473,12 +473,13 @@ What would you like to do?
 {Sty.GREEN}3{Sty.RESET}) 🔗 Link recent downloads
 {Sty.GREEN}4{Sty.RESET}) 📁 Browse by folder (legacy)
 {Sty.GREEN}5{Sty.RESET}) ⚙️  Settings & Preferences
-{Sty.GREEN}6{Sty.RESET}) ❓ Help & Tutorial
-{Sty.GREEN}7{Sty.RESET}) 🚪 Exit
+{Sty.GREEN}6{Sty.RESET}) 🛠️ Database Maintenance
+{Sty.GREEN}7{Sty.RESET}) ❓ Help & Tutorial
+{Sty.GREEN}8{Sty.RESET}) 🚪 Exit
 
 """
         )
-        choice = input("Enter your choice (1-7): ").strip()
+        choice = input("Enter your choice (1-8): ").strip()
 
         try:
             if choice == "1":
@@ -493,8 +494,10 @@ What would you like to do?
                 settings_menu()
                 config = load_config()  # Reload after settings change
             elif choice == "6":
+                maintenance_menu()
+            elif choice == "7":
                 show_interactive_help()
-            elif choice == "7" or choice.lower() in ["q", "quit", "exit"]:
+            elif choice == "8" or choice.lower() in ["q", "quit", "exit"]:
                 print(f"{Sty.CYAN}👋 Goodbye!{Sty.RESET}")
                 break
             else:
@@ -752,6 +755,98 @@ def folder_batch_wizard():
         )
 
     summary_table(stats, perf_counter())
+
+
+def maintenance_menu():
+    """Database maintenance and management menu"""
+    from .catalog import AudiobookCatalog
+
+    print(f"\n{Sty.CYAN}🛠️ DATABASE MAINTENANCE{Sty.RESET}")
+
+    while True:
+        print(
+            f"""
+{Sty.YELLOW}Database maintenance options:{Sty.RESET}
+
+{Sty.GREEN}1{Sty.RESET}) 🧹 Clean orphaned entries
+{Sty.GREEN}2{Sty.RESET}) 📊 Show database statistics
+{Sty.GREEN}3{Sty.RESET}) ⚡ Optimize database
+{Sty.GREEN}4{Sty.RESET}) 🧽 Vacuum database (reclaim space)
+{Sty.GREEN}5{Sty.RESET}) 🔍 Verify database integrity
+{Sty.GREEN}6{Sty.RESET}) 🔄 Rebuild indexes
+{Sty.GREEN}7{Sty.RESET}) ↩️  Back to main menu
+
+"""
+        )
+        choice = input("Enter your choice (1-7): ").strip()
+
+        catalog = AudiobookCatalog()
+
+        try:
+            if choice == "1":
+                print(f"\n{Sty.CYAN}🧹 Cleaning orphaned entries...{Sty.RESET}")
+                result = catalog.clean_orphaned_entries(True)
+                print(f"{Sty.GREEN}✅ Cleaned {result['removed']} orphaned entries{Sty.RESET}")
+
+            elif choice == "2":
+                print(f"\n{Sty.CYAN}📊 Database Statistics:{Sty.RESET}")
+                db_stats = catalog.get_db_stats()
+                idx_stats = catalog.get_index_stats()
+
+                print(f"  Database size: {db_stats.get('db_size', 0) / (1024*1024):.1f} MB")
+                print(f"  Items table: {db_stats.get('items_rows', 0)} rows")
+                print(f"  FTS table: {db_stats.get('items_fts_rows', 0)} rows")
+                print(f"  Indexes: {len(db_stats.get('indexes', []))}")
+
+                if db_stats.get("fts_integrity") is False:
+                    print(f"{Sty.YELLOW}  ⚠️  FTS integrity issues detected{Sty.RESET}")
+
+            elif choice == "3":
+                print(f"\n{Sty.CYAN}⚡ Optimizing database...{Sty.RESET}")
+                result = catalog.optimize_database(True)
+                print(f"{Sty.GREEN}✅ Database optimized{Sty.RESET}")
+                print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
+                print(f"  Time taken: {result['elapsed']:.2f}s")
+
+            elif choice == "4":
+                print(f"\n{Sty.CYAN}🧽 Vacuuming database...{Sty.RESET}")
+                result = catalog.vacuum_database(True)
+                print(f"{Sty.GREEN}✅ Database vacuumed{Sty.RESET}")
+                print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
+
+            elif choice == "5":
+                print(f"\n{Sty.CYAN}🔍 Verifying database integrity...{Sty.RESET}")
+                result = catalog.verify_integrity(True)
+
+                print(f"{Sty.CYAN}Integrity Check Results:{Sty.RESET}")
+                print(f"  SQLite integrity: {'✅ OK' if result['sqlite_integrity'] else '❌ FAILED'}")
+                print(f"  FTS integrity: {'✅ OK' if result['fts_integrity'] else '❌ FAILED'}")
+                print(f"  Orphaned FTS entries: {result['orphaned_fts_count']}")
+                print(f"  Missing FTS entries: {result['missing_fts_count']}")
+
+                if not all(v is not False for v in result.values() if v is not None):
+                    print(f"{Sty.YELLOW}⚠️  Issues found - consider running 'optimize'{Sty.RESET}")
+
+            elif choice == "6":
+                print(f"\n{Sty.CYAN}🔄 Rebuilding indexes...{Sty.RESET}")
+                result = catalog.rebuild_indexes(True)
+                print(f"{Sty.GREEN}✅ Indexes rebuilt successfully{Sty.RESET}")
+
+            elif choice == "7" or choice.lower() in ["q", "quit", "back"]:
+                catalog.close()
+                break
+
+            else:
+                print(f"{Sty.YELLOW}Invalid choice. Please enter 1-7.{Sty.RESET}")
+                catalog.close()
+                continue
+
+        except Exception as e:
+            print(f"{Sty.RED}❌ Error: {e}{Sty.RESET}")
+        finally:
+            catalog.close()
+
+        input(f"\n{Sty.YELLOW}Press Enter to continue...{Sty.RESET}")
 
 
 def settings_menu():
