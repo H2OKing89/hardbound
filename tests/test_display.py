@@ -1,10 +1,11 @@
 """
 Tests for display utilities
 """
+
 import shutil
 from unittest.mock import patch
 
-from hardbound.display import Sty, term_width, ellipsize, banner, section, summary_table
+from hardbound.display import Sty, banner, ellipsize, section, summary_table, term_width
 
 
 class TestSty:
@@ -38,18 +39,18 @@ class TestTermWidth:
 
     def test_term_width_success(self):
         """Test successful terminal width detection"""
-        with patch('shutil.get_terminal_size') as mock_size:
+        with patch("shutil.get_terminal_size") as mock_size:
             mock_size.return_value.columns = 80
             assert term_width() == 80
 
     def test_term_width_fallback(self):
         """Test fallback when terminal size detection fails"""
-        with patch('shutil.get_terminal_size', side_effect=Exception("No terminal")):
+        with patch("shutil.get_terminal_size", side_effect=Exception("No terminal")):
             assert term_width() == 100  # default
 
     def test_term_width_custom_default(self):
         """Test custom default width"""
-        with patch('shutil.get_terminal_size', side_effect=Exception("No terminal")):
+        with patch("shutil.get_terminal_size", side_effect=Exception("No terminal")):
             assert term_width(default=120) == 120
 
 
@@ -81,8 +82,8 @@ class TestEllipsize:
 class TestBanner:
     """Test banner display function"""
 
-    @patch('hardbound.display.term_width')
-    @patch('builtins.print')
+    @patch("hardbound.display.term_width")
+    @patch("builtins.print")
     def test_banner_dry_run(self, mock_print, mock_width):
         """Test banner display for dry run mode"""
         mock_width.return_value = 50
@@ -91,8 +92,8 @@ class TestBanner:
         # Should have printed something
         assert mock_print.called
 
-    @patch('hardbound.display.term_width')
-    @patch('builtins.print')
+    @patch("hardbound.display.term_width")
+    @patch("builtins.print")
     def test_banner_commit(self, mock_print, mock_width):
         """Test banner display for commit mode"""
         mock_width.return_value = 50
@@ -104,7 +105,7 @@ class TestBanner:
 class TestSection:
     """Test section display function"""
 
-    @patch('builtins.print')
+    @patch("builtins.print")
     def test_section_display(self, mock_print):
         """Test section header display"""
         section("Test Section")
@@ -118,7 +119,7 @@ class TestSection:
 class TestSummaryTable:
     """Test summary table display"""
 
-    @patch('builtins.print')
+    @patch("builtins.print")
     def test_summary_table_display(self, mock_print):
         """Test summary table display"""
         stats = {
@@ -128,7 +129,7 @@ class TestSummaryTable:
             "exists": 0,
             "excluded": 3,
             "skipped": 2,
-            "errors": 1
+            "errors": 1,
         }
         summary_table(stats, 1.23)
 

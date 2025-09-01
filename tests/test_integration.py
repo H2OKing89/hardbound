@@ -1,16 +1,17 @@
 """
 Integration tests for Hardbound audiobook hardlink manager
 """
-import tempfile
+
 import shutil
+import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from hardbound.catalog import AudiobookCatalog
-from hardbound.linker import plan_and_link
 from hardbound.config import load_config, save_config
+from hardbound.linker import plan_and_link
 
 
 @pytest.mark.integration
@@ -37,7 +38,7 @@ class TestCatalogIntegration:
 
             # Mock the database to use a temporary location
             test_db = temp_path / "test.db"
-            with patch('hardbound.catalog.DB_FILE', test_db):
+            with patch("hardbound.catalog.DB_FILE", test_db):
                 # Test catalog creation and indexing
                 catalog = AudiobookCatalog()
                 count = catalog.index_directory(library_dir, verbose=False)
@@ -46,7 +47,7 @@ class TestCatalogIntegration:
                 # Test search functionality
                 results = catalog.search("Author One")
                 assert len(results) == 1
-                assert results[0]['author'] == 'Author One'
+                assert results[0]["author"] == "Author One"
 
                 # Test search with multiple results
                 results = catalog.search("*")
@@ -61,7 +62,7 @@ class TestCatalogIntegration:
             db_path = temp_path / "test_catalog.db"
 
             # Mock the database path
-            with patch('hardbound.catalog.DB_FILE', db_path):
+            with patch("hardbound.catalog.DB_FILE", db_path):
                 # First session
                 catalog1 = AudiobookCatalog()
                 # Add some mock data by indexing a directory
@@ -79,7 +80,7 @@ class TestCatalogIntegration:
                 results = catalog2.search("*")
                 assert len(results) == 1
                 # The parsing logic extracts author from the parent directory name
-                assert 'Test Author' in results[0]['path']
+                assert "Test Author" in results[0]["path"]
 
                 catalog2.close()
 
@@ -104,11 +105,25 @@ class TestLinkingIntegration:
             dst_root.mkdir()
 
             # Test linking
-            stats = {"linked": 0, "replaced": 0, "already": 0, "exists": 0, "excluded": 0, "skipped": 0, "errors": 0}
+            stats = {
+                "linked": 0,
+                "replaced": 0,
+                "already": 0,
+                "exists": 0,
+                "excluded": 0,
+                "skipped": 0,
+                "errors": 0,
+            }
 
             plan_and_link(
-                src_dir, dst_root / "Test Book",
-                "Test Book", False, False, False, False, stats
+                src_dir,
+                dst_root / "Test Book",
+                "Test Book",
+                False,
+                False,
+                False,
+                False,
+                stats,
             )
 
             # Verify results
@@ -133,23 +148,24 @@ class TestConfigIntegration:
             config_file = config_dir / "config.json"
 
             # Mock the config paths
-            with patch('hardbound.config.CONFIG_DIR', config_dir), \
-                 patch('hardbound.config.CONFIG_FILE', config_file):
+            with patch("hardbound.config.CONFIG_DIR", config_dir), patch(
+                "hardbound.config.CONFIG_FILE", config_file
+            ):
 
                 # Test default config
                 config = load_config()
-                assert config['first_run'] is True
-                assert config['library_path'] == ""
+                assert config["first_run"] is True
+                assert config["library_path"] == ""
 
                 # Test saving config
-                config['library_path'] = '/test/path'
-                config['first_run'] = False
+                config["library_path"] = "/test/path"
+                config["first_run"] = False
                 save_config(config)
 
                 # Test loading saved config
                 loaded_config = load_config()
-                assert loaded_config['library_path'] == '/test/path'
-                assert loaded_config['first_run'] is False
+                assert loaded_config["library_path"] == "/test/path"
+                assert loaded_config["first_run"] is False
 
 
 @pytest.mark.integration
@@ -165,9 +181,11 @@ class TestCliIntegration:
         # Get the path to hardbound.py
         hardbound_path = Path(__file__).parent.parent / "hardbound.py"
 
-        result = subprocess.run([
-            sys.executable, str(hardbound_path), "--help"
-        ], capture_output=True, text=True)
+        result = subprocess.run(
+            [sys.executable, str(hardbound_path), "--help"],
+            capture_output=True,
+            text=True,
+        )
 
         assert result.returncode == 0
         assert "Hardbound" in result.stdout
@@ -181,9 +199,11 @@ class TestCliIntegration:
 
         hardbound_path = Path(__file__).parent.parent / "hardbound.py"
 
-        result = subprocess.run([
-            sys.executable, str(hardbound_path), "--invalid-flag"
-        ], capture_output=True, text=True)
+        result = subprocess.run(
+            [sys.executable, str(hardbound_path), "--invalid-flag"],
+            capture_output=True,
+            text=True,
+        )
 
         # Should exit with error but not crash
         assert result.returncode != 0

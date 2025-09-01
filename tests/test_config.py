@@ -1,6 +1,7 @@
 """
 Tests for configuration management
 """
+
 import json
 import tempfile
 from pathlib import Path
@@ -8,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from hardbound.config import load_config, save_config, CONFIG_DIR, CONFIG_FILE
+from hardbound.config import CONFIG_DIR, CONFIG_FILE, load_config, save_config
 
 
 class TestConfig:
@@ -16,7 +17,7 @@ class TestConfig:
 
     def test_load_config_default(self):
         """Test loading default config when no file exists"""
-        with patch('pathlib.Path.exists', return_value=False):
+        with patch("pathlib.Path.exists", return_value=False):
             config = load_config()
             expected = {
                 "first_run": True,
@@ -24,7 +25,7 @@ class TestConfig:
                 "torrent_path": "",
                 "zero_pad": True,
                 "also_cover": False,
-                "recent_sources": []
+                "recent_sources": [],
             }
             assert config == expected
 
@@ -35,18 +36,20 @@ class TestConfig:
             "library_path": "/test/path",
             "zero_pad": False,
             "also_cover": True,
-            "recent_sources": ["/path1", "/path2"]
+            "recent_sources": ["/path1", "/path2"],
         }
 
-        with patch('pathlib.Path.exists', return_value=True), \
-             patch('pathlib.Path.read_text', return_value=json.dumps(test_config)):
+        with patch("pathlib.Path.exists", return_value=True), patch(
+            "pathlib.Path.read_text", return_value=json.dumps(test_config)
+        ):
             config = load_config()
             assert config == test_config
 
     def test_load_config_invalid_json(self):
         """Test loading config with invalid JSON falls back to defaults"""
-        with patch('pathlib.Path.exists', return_value=True), \
-             patch('pathlib.Path.read_text', side_effect=json.JSONDecodeError("Invalid", "", 0)):
+        with patch("pathlib.Path.exists", return_value=True), patch(
+            "pathlib.Path.read_text", side_effect=json.JSONDecodeError("Invalid", "", 0)
+        ):
             config = load_config()
             assert config["first_run"] is True  # Should be default
 
@@ -58,8 +61,9 @@ class TestConfig:
             temp_config_dir = Path(temp_dir) / ".config" / "hardbound"
             temp_config_file = temp_config_dir / "config.json"
 
-            with patch('hardbound.config.CONFIG_DIR', temp_config_dir), \
-                 patch('hardbound.config.CONFIG_FILE', temp_config_file):
+            with patch("hardbound.config.CONFIG_DIR", temp_config_dir), patch(
+                "hardbound.config.CONFIG_FILE", temp_config_file
+            ):
                 save_config(test_config)
 
                 assert temp_config_file.exists()
@@ -74,8 +78,9 @@ class TestConfig:
             temp_config_dir = Path(temp_dir) / ".config" / "hardbound"
             temp_config_file = temp_config_dir / "config.json"
 
-            with patch('hardbound.config.CONFIG_DIR', temp_config_dir), \
-                 patch('hardbound.config.CONFIG_FILE', temp_config_file):
+            with patch("hardbound.config.CONFIG_DIR", temp_config_dir), patch(
+                "hardbound.config.CONFIG_FILE", temp_config_file
+            ):
                 assert not temp_config_dir.exists()
                 save_config(test_config)
                 assert temp_config_dir.exists()

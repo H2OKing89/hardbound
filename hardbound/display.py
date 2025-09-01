@@ -1,12 +1,15 @@
 """
 Display utilities and formatting
 """
-import shutil
+
 import re
+import shutil
 from pathlib import Path
+
 
 class Sty:
     """ANSI color codes for terminal output"""
+
     RESET = "\x1b[0m"
     BOLD = "\x1b[1m"
     DIM = "\x1b[2m"
@@ -29,28 +32,36 @@ class Sty:
             if isinstance(v, str) and v.startswith("\x1b"):
                 setattr(cls, k, "")
 
+
 def term_width(default=100):
     try:
         return shutil.get_terminal_size().columns
     except Exception:
         return default
 
+
 def ellipsize(s: str, limit: int) -> str:
     if len(s) <= limit:
         return s
     if limit <= 10:
-        return s[:max(0, limit - 1)] + "…"
+        return s[: max(0, limit - 1)] + "…"
     keep = (limit - 1) // 2
-    return s[:keep] + "… " + s[-(limit - keep - 2):]
+    return s[:keep] + "… " + s[-(limit - keep - 2) :]
+
 
 def banner(title: str, mode: str):
     w = term_width()
     line = "─" * max(4, w - 2)
     label = f"{Sty.BOLD}{Sty.CYAN} {title} {Sty.RESET}"
-    mode_tag = f"{Sty.YELLOW}[DRY-RUN]{Sty.RESET}" if mode == "dry" else f"{Sty.GREEN}[COMMIT]{Sty.RESET}"
+    mode_tag = (
+        f"{Sty.YELLOW}[DRY-RUN]{Sty.RESET}"
+        if mode == "dry"
+        else f"{Sty.GREEN}[COMMIT]{Sty.RESET}"
+    )
     print(f"┌{line}┐")
     print(f"│ {label}{mode_tag}".ljust(w - 1) + "│")
     print(f"└{line}┘")
+
 
 def section(title: str):
     w = term_width()
@@ -58,23 +69,31 @@ def section(title: str):
     print(f"{Sty.MAGENTA}{title}{Sty.RESET}")
     print(line)
 
-def row(status_icon: str, status_color: str, kind: str, src: Path, dst: Path, dry: bool):
+
+def row(
+    status_icon: str, status_color: str, kind: str, src: Path, dst: Path, dry: bool
+):
     w = term_width()
     left = f"{status_icon} {status_color}{kind:<6}{Sty.RESET}"
     middle = f"{Sty.GREY}{src}{Sty.RESET} {Sty.DIM}→{Sty.RESET} {dst}"
     usable = max(20, w - len(strip_ansi(left)) - 6)
     print(f"{left}  {ellipsize(middle, usable)}")
 
+
 def strip_ansi(s: str) -> str:
     import re
+
     return re.sub(r"\x1b\[[0-9;]*m", "", s)
+
 
 def summary_table(stats: dict, elapsed: float):
     w = term_width()
     line = "─" * max(4, w - 2)
     print(line)
+
     def cell(label, n, color):
         return f"{color}{label}:{Sty.RESET} {n}"
+
     cells = [
         cell("linked", stats["linked"], Sty.GREEN),
         cell("replaced", stats["replaced"], Sty.BLUE),

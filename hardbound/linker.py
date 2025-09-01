@@ -1,6 +1,7 @@
 """
 Core hardlinking functionality
 """
+
 import os
 import re
 import sys
@@ -25,12 +26,16 @@ IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 DOC_EXTS = {".pdf", ".txt", ".nfo"}
 AUDIO_EXTS = {".m4b", ".mp3", ".flac", ".m4a"}
 
+
 def zero_pad_vol(name: str, width: int = 2) -> str:
     """Turn 'vol_4' into 'vol_04' (width=2) only in the basename string provided."""
+
     def pad(match):
         num = match.group(1)
         return f"vol_{int(num):0{width}d}"
+
     return re.sub(r"vol_(\d+)", pad, name)
+
 
 def normalize_weird_ext(src_name: str) -> str:
     """Normalize weird suffixes like *.cue.jpg -> *.jpg and *.cue.m4b -> *.m4b."""
@@ -39,13 +44,16 @@ def normalize_weird_ext(src_name: str) -> str:
             return src_name[: -len(bad)] + good
     return src_name
 
+
 def clean_base_name(name: str) -> str:
     """Remove user tags from base name for cleaner destination names"""
     # Remove common user tags like [H2OKing], [UserName], etc.
     # Pattern: [anything] at the end of the name
     import re
-    cleaned = re.sub(r'\s*\[[^\]]+\]\s*$', '', name)
+
+    cleaned = re.sub(r"\s*\[[^\]]+\]\s*$", "", name)
     return cleaned.strip()
+
 
 def dest_is_excluded(p: Path) -> bool:
     """Check if destination should be excluded"""
@@ -56,6 +64,7 @@ def dest_is_excluded(p: Path) -> bool:
         return True
     return False
 
+
 def same_inode(a: Path, b: Path) -> bool:
     try:
         sa = a.stat()
@@ -63,6 +72,7 @@ def same_inode(a: Path, b: Path) -> bool:
         return (sa.st_ino == sb.st_ino) and (sa.st_dev == sb.st_dev)
     except FileNotFoundError:
         return False
+
 
 def ensure_dir(p: Path, dry_run: bool, stats: dict):
     if p.exists():
@@ -74,11 +84,12 @@ def ensure_dir(p: Path, dry_run: bool, stats: dict):
         p.mkdir(parents=True, exist_ok=True)
         row("📁", Sty.BLUE, "mkdir", Path("—"), p, dry_run)
 
+
 def choose_base_outputs(dest_dir: Path, base_name: str):
     """Return canonical dest paths for common types."""
     # Remove user tags from file names while keeping them in folder names
     clean_file_base = clean_base_name(base_name)
-    
+
     return {
         "cue": dest_dir / f"{clean_file_base}.cue",
         "jpg": dest_dir / f"{clean_file_base}.jpg",
@@ -89,6 +100,7 @@ def choose_base_outputs(dest_dir: Path, base_name: str):
         "txt": dest_dir / f"{clean_file_base}.txt",
         "nfo": dest_dir / f"{clean_file_base}.nfo",
     }
+
 
 def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
     # Safety: ensure we have a valid source
@@ -151,9 +163,17 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
             print(f"{Sty.RED}    {e}{Sty.RESET}", file=sys.stderr)
             stats["errors"] += 1
 
-def plan_and_link(src_dir: Path, dst_dir: Path, base_name: str, 
-                  also_cover: bool, zero_pad: bool, force: bool, 
-                  dry_run: bool, stats: dict):
+
+def plan_and_link(
+    src_dir: Path,
+    dst_dir: Path,
+    base_name: str,
+    also_cover: bool,
+    zero_pad: bool,
+    force: bool,
+    dry_run: bool,
+    stats: dict,
+):
     if zero_pad:
         base_name = zero_pad_vol(base_name)
 
@@ -164,7 +184,10 @@ def plan_and_link(src_dir: Path, dst_dir: Path, base_name: str,
     try:
         files = list(src_dir.iterdir())
     except FileNotFoundError:
-        print(f"{Sty.RED}[ERR] Source directory not found: {src_dir}{Sty.RESET}", file=sys.stderr)
+        print(
+            f"{Sty.RED}[ERR] Source directory not found: {src_dir}{Sty.RESET}",
+            file=sys.stderr,
+        )
         stats["errors"] += 1
         return
 
@@ -227,14 +250,25 @@ def plan_and_link(src_dir: Path, dst_dir: Path, base_name: str,
                 src_img = None
                 if not named_cover.exists():
                     src_img = next(
-                        (p for p, n in normalized
-                         if normalize_weird_ext(n).lower().endswith((".jpg", ".jpeg", ".png"))),
-                        None
+                        (
+                            p
+                            for p, n in normalized
+                            if normalize_weird_ext(n)
+                            .lower()
+                            .endswith((".jpg", ".jpeg", ".png"))
+                        ),
+                        None,
                     )
-                do_link(src_img if src_img is not None else named_cover,
-                        plain_cover, force=force, dry_run=dry_run, stats=stats)
+                do_link(
+                    src_img if src_img is not None else named_cover,
+                    plain_cover,
+                    force=force,
+                    dry_run=dry_run,
+                    stats=stats,
+                )
         else:
             row("🚫", Sty.GREY, "excl.", named_cover, plain_cover, dry_run)
+
 
 def preflight_checks(src: Path, dst: Path) -> bool:
     """Run preflight checks before linking"""
@@ -242,7 +276,7 @@ def preflight_checks(src: Path, dst: Path) -> bool:
     if not src.exists():
         print(f"{Sty.RED}❌ Source doesn't exist: {src}{Sty.RESET}")
         return False
-    
+
     # Check same filesystem
     try:
         if src.stat().st_dev != dst.parent.stat().st_dev:
@@ -253,22 +287,32 @@ def preflight_checks(src: Path, dst: Path) -> bool:
             return False
     except FileNotFoundError:
         pass  # Destination doesn't exist yet, that's ok
-    
+
     # Check for Unraid user/disk mixing
     src_str, dst_str = str(src), str(dst)
-    if ("/mnt/user/" in src_str and "/mnt/disk" in dst_str) or \
-       ("/mnt/disk" in src_str and "/mnt/user/" in dst_str):
+    if ("/mnt/user/" in src_str and "/mnt/disk" in dst_str) or (
+        "/mnt/disk" in src_str and "/mnt/user/" in dst_str
+    ):
         print(f"{Sty.RED}❌ Unraid user/disk mixing detected{Sty.RESET}")
         print(f"   Hardlinks won't work between /mnt/user and /mnt/disk paths")
         return False
-    
+
     return True
+
 
 def run_batch(batch_file: Path, also_cover, zero_pad, force, dry_run):
     """Process batch file with src|dst pairs"""
     from .display import Sty, section
-    
-    stats = {"linked":0, "replaced":0, "already":0, "exists":0, "excluded":0, "skipped":0, "errors":0}
+
+    stats = {
+        "linked": 0,
+        "replaced": 0,
+        "already": 0,
+        "exists": 0,
+        "excluded": 0,
+        "skipped": 0,
+        "errors": 0,
+    }
     with batch_file.open() as fh:
         for line in fh:
             line = line.strip()
@@ -277,7 +321,9 @@ def run_batch(batch_file: Path, also_cover, zero_pad, force, dry_run):
             try:
                 src_s, dst_s = [x.strip() for x in line.split("|", 1)]
             except ValueError:
-                print(f"{Sty.YELLOW}[WARN] bad line (expected 'SRC|DST'): {line}{Sty.RESET}")
+                print(
+                    f"{Sty.YELLOW}[WARN] bad line (expected 'SRC|DST'): {line}{Sty.RESET}"
+                )
                 continue
             src = Path(src_s)
             dst = Path(dst_s)

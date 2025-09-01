@@ -1,6 +1,7 @@
 """
 Tests for core hardlinking functionality
 """
+
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -8,15 +9,15 @@ from unittest.mock import patch
 import pytest
 
 from hardbound.linker import (
-    zero_pad_vol,
-    normalize_weird_ext,
+    AUDIO_EXTS,
+    EXCLUDE_DEST_EXTS,
+    EXCLUDE_DEST_NAMES,
+    IMG_EXTS,
+    WEIRD_SUFFIXES,
     clean_base_name,
     dest_is_excluded,
-    EXCLUDE_DEST_NAMES,
-    EXCLUDE_DEST_EXTS,
-    WEIRD_SUFFIXES,
-    IMG_EXTS,
-    AUDIO_EXTS
+    normalize_weird_ext,
+    zero_pad_vol,
 )
 
 

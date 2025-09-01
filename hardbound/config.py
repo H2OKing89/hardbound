@@ -1,11 +1,13 @@
 """
 Configuration management
 """
+
 import json
 from pathlib import Path
 
 CONFIG_DIR = Path.home() / ".config" / "hardbound"
 CONFIG_FILE = CONFIG_DIR / "config.json"
+
 
 def load_config():
     """Load configuration with sensible defaults"""
@@ -20,8 +22,9 @@ def load_config():
         "torrent_path": "",
         "zero_pad": True,
         "also_cover": False,
-        "recent_sources": []
+        "recent_sources": [],
     }
+
 
 def save_config(config_data):
     """Save configuration to file"""
