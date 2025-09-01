@@ -4,7 +4,8 @@ Configuration management with validation and migration
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
 from .utils.validation import PathValidator
 
 CONFIG_DIR = Path.home() / ".config" / "hardbound"
@@ -21,13 +22,13 @@ DEFAULT_CONFIG = {
     "recent_sources": [],
     "system_search_paths": [
         "/mnt/user/data/audio/audiobooks",
-        "/mnt/user/data/downloads"
+        "/mnt/user/data/downloads",
     ],
     "search_history_size": 100,
     "ui_theme": "default",
     "auto_update_catalog": True,
     "parallel_processing": True,
-    "max_parallel_jobs": 4
+    "max_parallel_jobs": 4,
 }
 
 CONFIG_VALIDATORS = {
@@ -36,12 +37,13 @@ CONFIG_VALIDATORS = {
     "zero_pad": lambda x: isinstance(x, bool),
     "also_cover": lambda x: isinstance(x, bool),
     "recent_sources": lambda x: isinstance(x, list),
-    "system_search_paths": lambda x: isinstance(x, list) and all(isinstance(p, str) for p in x),
+    "system_search_paths": lambda x: isinstance(x, list)
+    and all(isinstance(p, str) for p in x),
     "search_history_size": lambda x: isinstance(x, int) and x > 0,
     "ui_theme": lambda x: isinstance(x, str) and x in ["default", "dark", "light"],
     "auto_update_catalog": lambda x: isinstance(x, bool),
     "parallel_processing": lambda x: isinstance(x, bool),
-    "max_parallel_jobs": lambda x: isinstance(x, int) and 1 <= x <= 16
+    "max_parallel_jobs": lambda x: isinstance(x, int) and 1 <= x <= 16,
 }
 
 
@@ -118,7 +120,9 @@ class ConfigManager:
                     errors.append(f"Validation error for '{key}': {e}")
 
         if errors:
-            error_msg = "Configuration validation errors:\n" + "\n".join(f"  • {e}" for e in errors)
+            error_msg = "Configuration validation errors:\n" + "\n".join(
+                f"  • {e}" for e in errors
+            )
             raise ValueError(error_msg)
 
     def get(self, key: str, default: Any = None) -> Any:

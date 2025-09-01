@@ -5,6 +5,7 @@ Display utilities and formatting using Rich
 import re
 import shutil
 from pathlib import Path
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -56,14 +57,11 @@ def ellipsize(s: str, limit: int) -> str:
 def banner(title: str, mode: str):
     """Display a banner with title and mode using Rich Panel"""
     mode_tag = (
-        "[yellow][DRY-RUN][/yellow]"
-        if mode == "dry"
-        else "[green][COMMIT][/green]"
+        "[yellow][DRY-RUN][/yellow]" if mode == "dry" else "[green][COMMIT][/green]"
     )
 
     panel = Panel.fit(
-        f"[bold cyan] {title} [/bold cyan]{mode_tag}",
-        border_style="cyan"
+        f"[bold cyan] {title} [/bold cyan]{mode_tag}", border_style="cyan"
     )
     console.print(panel)
 
@@ -86,7 +84,7 @@ def row(
         Sty.RED: "red",
         Sty.GREY: "gray",
         Sty.CYAN: "cyan",
-        Sty.MAGENTA: "magenta"
+        Sty.MAGENTA: "magenta",
     }
 
     # Handle both old Sty constants and direct color strings

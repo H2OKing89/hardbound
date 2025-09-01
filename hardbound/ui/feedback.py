@@ -1,9 +1,11 @@
 """Visual feedback and messaging system with Rich"""
-from typing import Dict, Any, Optional
+
+import time
+from typing import Any, Dict, Optional
+
+from rich import box
 from rich.console import Console
 from rich.panel import Panel
-from rich import box
-import time
 
 
 class VisualFeedback:
@@ -51,7 +53,7 @@ class VisualFeedback:
             title=f"[bold cyan]{title}[/bold cyan]",
             box=box.DOUBLE,
             padding=(0, 2),
-            border_style="cyan"
+            border_style="cyan",
         )
         self.console.print(panel)
 
@@ -60,7 +62,13 @@ class ProgressIndicator:
     """Visual progress feedback for long operations with Rich"""
 
     def __init__(self, title: str, total: Optional[int] = None):
-        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+        from rich.progress import (
+            BarColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
 
         self.title = title
         self.total = total
@@ -89,7 +97,9 @@ class ProgressIndicator:
         self.start_time = time.time()
         self.progress.start()
         if self.total:
-            self.task_id = self.progress.add_task(f"[cyan]{self.title}...", total=self.total)
+            self.task_id = self.progress.add_task(
+                f"[cyan]{self.title}...", total=self.total
+            )
         else:
             self.task_id = self.progress.add_task(f"[cyan]{self.title}...", total=None)
 
@@ -98,14 +108,24 @@ class ProgressIndicator:
         self.current += 1
         if self.task_id is not None:
             if self.total:
-                self.progress.update(self.task_id, completed=self.current, description=f"[cyan]{self.title}: {message}")
+                self.progress.update(
+                    self.task_id,
+                    completed=self.current,
+                    description=f"[cyan]{self.title}: {message}",
+                )
             else:
-                self.progress.update(self.task_id, description=f"[cyan]{self.title}: {message}")
+                self.progress.update(
+                    self.task_id, description=f"[cyan]{self.title}: {message}"
+                )
 
     def done(self, message: str = "Complete"):
         """Mark as complete"""
         if self.task_id is not None and self.total:
-            self.progress.update(self.task_id, completed=self.total, description=f"[green]{self.title} {message}")
+            self.progress.update(
+                self.task_id,
+                completed=self.total,
+                description=f"[green]{self.title} {message}",
+            )
 
         elapsed = None
         if self.start_time:
@@ -134,17 +154,16 @@ class ErrorHandler:
         if not p.exists():
             self.feedback.error(
                 f"Path not found: {path}",
-                "Check the path spelling and ensure the location exists"
+                "Check the path spelling and ensure the location exists",
             )
         elif not p.is_dir():
             self.feedback.error(
-                f"Not a directory: {path}",
-                "Expected a folder but found a file"
+                f"Not a directory: {path}", "Expected a folder but found a file"
             )
         else:
             self.feedback.error(
                 f"Access denied: {path}",
-                "Check permissions or try running with elevated privileges"
+                "Check permissions or try running with elevated privileges",
             )
 
     def handle_operation_error(self, error: Exception, context: str):
@@ -153,21 +172,19 @@ class ErrorHandler:
 
         if "permission" in error_msg:
             self.feedback.error(
-                f"Permission denied during {context}",
-                "Check file/folder permissions"
+                f"Permission denied during {context}", "Check file/folder permissions"
             )
         elif "disk" in error_msg or "space" in error_msg:
             self.feedback.error(
-                f"Disk space issue during {context}",
-                "Free up disk space and try again"
+                f"Disk space issue during {context}", "Free up disk space and try again"
             )
         elif "network" in error_msg:
             self.feedback.error(
                 f"Network error during {context}",
-                "Check network connection and try again"
+                "Check network connection and try again",
             )
         else:
             self.feedback.error(
                 f"Operation failed: {error}",
-                "Try again or check the logs for more details"
+                "Try again or check the logs for more details",
             )

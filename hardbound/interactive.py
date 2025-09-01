@@ -11,14 +11,15 @@ from pathlib import Path
 from time import perf_counter
 from typing import Dict, List, Optional
 
+from rich.console import Console
+
 from .catalog import DB_FILE, AudiobookCatalog
 from .config import load_config, save_config
 from .display import Sty, summary_table
 from .linker import plan_and_link, zero_pad_vol
-from .ui.menu import menu_system, create_main_menu, create_quick_actions_menu
-from .ui.feedback import VisualFeedback, ErrorHandler, ProgressIndicator
-from .utils.validation import PathValidator, InputValidator
-from rich.console import Console
+from .ui.feedback import ErrorHandler, ProgressIndicator, VisualFeedback
+from .ui.menu import create_main_menu, create_quick_actions_menu, menu_system
+from .utils.validation import InputValidator, PathValidator
 
 # Global Rich console for consistent output
 console = Console()
@@ -217,8 +218,10 @@ def enhanced_text_search_browser(catalog) -> List[str]:
     search_history = []
     if history_file.exists():
         try:
-            with open(history_file, 'r', encoding='utf-8') as f:
-                search_history = [line.strip() for line in f.readlines() if line.strip()]
+            with open(history_file, "r", encoding="utf-8") as f:
+                search_history = [
+                    line.strip() for line in f.readlines() if line.strip()
+                ]
         except Exception:
             pass  # Ignore history loading errors
 
@@ -239,8 +242,8 @@ def enhanced_text_search_browser(catalog) -> List[str]:
         search_history.insert(0, query)
         search_history = search_history[:50]  # Keep last 50 searches
         try:
-            with open(history_file, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(search_history))
+            with open(history_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(search_history))
         except Exception:
             pass  # Ignore history saving errors
 
@@ -314,15 +317,17 @@ def _get_autocomplete_suggestions(catalog) -> List[str]:
     suggestions = set()
 
     # Check if this is a database-backed catalog
-    if hasattr(catalog, 'conn'):
+    if hasattr(catalog, "conn"):
         # Database-backed catalog (AudiobookCatalog)
         try:
-            cursor = catalog.conn.execute("""
+            cursor = catalog.conn.execute(
+                """
                 SELECT author, series, book FROM items
                 WHERE author != 'Unknown'
                 ORDER BY mtime DESC
                 LIMIT 100
-            """)
+            """
+            )
 
             for row in cursor.fetchall():
                 author = row[0]
@@ -337,7 +342,7 @@ def _get_autocomplete_suggestions(catalog) -> List[str]:
                     # Add first few words of book title
                     words = book.split()[:3]
                     if len(words) >= 2:
-                        suggestions.add(' '.join(words))
+                        suggestions.add(" ".join(words))
 
         except Exception:
             pass  # Ignore errors
@@ -359,7 +364,7 @@ def _get_autocomplete_suggestions(catalog) -> List[str]:
                     # Add first few words of book title
                     words = book.split()[:3]
                     if len(words) >= 2:
-                        suggestions.add(' '.join(words))
+                        suggestions.add(" ".join(words))
 
         except Exception:
             pass  # Ignore errors
@@ -546,7 +551,9 @@ def interactive_mode():
         default_path = PathValidator.get_default_search_paths()
         if default_path:
             progress = ProgressIndicator("Building catalog")
-            catalog.index_directory(default_path[0], verbose=False, progress_callback=progress)
+            catalog.index_directory(
+                default_path[0], verbose=False, progress_callback=progress
+            )
         catalog.close()
 
     # First run setup with better UX
@@ -558,7 +565,7 @@ def interactive_mode():
     create_quick_actions_menu()
 
     # Main interaction loop
-    current_menu = 'main'
+    current_menu = "main"
     running = True
     while running:
         try:
@@ -567,10 +574,10 @@ def interactive_mode():
                 result = menu_system.handle_choice(current_menu, choice)
                 if isinstance(result, str):
                     # Menu switch requested
-                    if result in ['main', 'quick']:
+                    if result in ["main", "quick"]:
                         current_menu = result
                     else:
-                        running = False if result == 'exit' else True
+                        running = False if result == "exit" else True
                 else:
                     # Boolean result
                     running = result if result is not None else True
@@ -594,8 +601,8 @@ def _first_run_setup(config):
         "Welcome to Hardbound!",
         {
             "Setup": "Let's configure your paths",
-            "Tip": "You can change these later in Settings"
-        }
+            "Tip": "You can change these later in Settings",
+        },
     )
 
     # Library path setup
@@ -612,7 +619,9 @@ def _first_run_setup(config):
                     continue
             else:
                 feedback = VisualFeedback()
-                feedback.warning("No path provided", "You can set this later in Settings")
+                feedback.warning(
+                    "No path provided", "You can set this later in Settings"
+                )
                 break
         else:
             library_path = PathValidator.validate_library_path(path_str)
@@ -626,7 +635,9 @@ def _first_run_setup(config):
         path_str = input(f"[cyan]➤[/cyan] Torrent destination root: ").strip()
         if not path_str:
             feedback = VisualFeedback()
-            feedback.warning("No destination provided", "You can set this later in Settings")
+            feedback.warning(
+                "No destination provided", "You can set this later in Settings"
+            )
             break
 
         dest_path = PathValidator.validate_destination_path(path_str)
@@ -641,6 +652,7 @@ def _first_run_setup(config):
 
 
 # Progress indicator for long operations - Now using Rich-based ProgressIndicator from ui.feedback
+
 
 def search_and_link_wizard():
     """Search-first linking wizard with hierarchical browsing"""
@@ -753,7 +765,9 @@ def update_catalog_wizard():
 
         print(f"\n📂 Scanning library path: {library_path}")
         progress = ProgressIndicator("Indexing audiobooks")
-        count = catalog.index_directory(library_path, verbose=False, progress_callback=progress)
+        count = catalog.index_directory(
+            library_path, verbose=False, progress_callback=progress
+        )
         console.print(f"[green]✅ Indexed {count} audiobooks[/green]")
     elif choice == "2":
         # Manual directory selection
@@ -761,7 +775,9 @@ def update_catalog_wizard():
         if root.exists() and root.is_dir():
             print(f"\n📂 Scanning directory: {root}")
             progress = ProgressIndicator("Indexing audiobooks")
-            count = catalog.index_directory(root, verbose=False, progress_callback=progress)
+            count = catalog.index_directory(
+                root, verbose=False, progress_callback=progress
+            )
             console.print(f"[green]✅ Indexed {count} audiobooks[/green]")
         else:
             console.print(f"[red]❌ Invalid directory: {root}[/red]")

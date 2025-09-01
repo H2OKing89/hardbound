@@ -1,11 +1,14 @@
 """Unified menu system with Rich for perfect Unicode handling"""
+
 import re
 import unicodedata
-from typing import Dict, Callable, Optional
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
+from typing import Callable, Dict, Optional
+
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
 from .feedback import VisualFeedback
 
 
@@ -17,7 +20,9 @@ class MenuSystem:
         self.current_menu: Optional[str] = None
         self.console = Console()
 
-    def add_menu(self, name: str, title: str, options: Dict[str, tuple], width: int = 50):
+    def add_menu(
+        self, name: str, title: str, options: Dict[str, tuple], width: int = 50
+    ):
         """Add a menu with options
 
         Args:
@@ -26,11 +31,7 @@ class MenuSystem:
             options: Dict of {choice: (label, handler)}
             width: Menu width in characters
         """
-        self.menus[name] = {
-            'title': title,
-            'options': options,
-            'width': width
-        }
+        self.menus[name] = {"title": title, "options": options, "width": width}
 
     def display_menu(self, name: str) -> Optional[str]:
         """Display a menu using Rich for perfect alignment
@@ -49,7 +50,7 @@ class MenuSystem:
         table.add_column(justify="left")
 
         # Add menu items
-        for choice, (label, _) in menu['options'].items():
+        for choice, (label, _) in menu["options"].items():
             table.add_row(f"[bold green]{choice})[/] {label}")
 
         # Create panel with perfect borders
@@ -58,17 +59,19 @@ class MenuSystem:
             title=f"[bold cyan]{menu['title']}[/]",
             box=box.DOUBLE,  # ╔═╦═╗ style
             padding=(0, 2),
-            border_style="cyan"
+            border_style="cyan",
         )
 
         self.console.print(panel)
-        return self._get_choice(list(menu['options'].keys()))
+        return self._get_choice(list(menu["options"].keys()))
 
     def _get_choice(self, valid_choices: list) -> Optional[str]:
         """Get and validate user choice"""
         while True:
             try:
-                choice = self.console.input("[bold cyan]➤ Enter choice: [/]").strip().lower()
+                choice = (
+                    self.console.input("[bold cyan]➤ Enter choice: [/]").strip().lower()
+                )
 
                 if not choice:
                     continue
@@ -83,7 +86,9 @@ class MenuSystem:
                         if valid.lower().startswith(choice):
                             return valid
 
-                self.console.print(f"[yellow]⚠️  Invalid choice. Please select from: {', '.join(valid_choices)}[/yellow]")
+                self.console.print(
+                    f"[yellow]⚠️  Invalid choice. Please select from: {', '.join(valid_choices)}[/yellow]"
+                )
 
             except KeyboardInterrupt:
                 self.console.print("[cyan]👋 Cancelled[/cyan]")
@@ -97,8 +102,8 @@ class MenuSystem:
             return True
 
         menu = self.menus[menu_name]
-        if choice in menu['options']:
-            label, handler = menu['options'][choice]
+        if choice in menu["options"]:
+            label, handler = menu["options"][choice]
             if handler:
                 try:
                     result = handler()
@@ -113,12 +118,12 @@ class MenuSystem:
 def display_width(text: str) -> int:
     """Calculate the display width of text, accounting for full-width characters"""
     # Remove ANSI codes first
-    clean_text = re.sub(r'\x1b\[[0-9;]*m', '', text)
+    clean_text = re.sub(r"\x1b\[[0-9;]*m", "", text)
 
     width = 0
     for char in clean_text:
         # Check if character is full-width (East Asian Wide, Full-width, etc.)
-        if unicodedata.east_asian_width(char) in ('W', 'F', 'A'):
+        if unicodedata.east_asian_width(char) in ("W", "F", "A"):
             width += 2
         else:
             width += 1
@@ -131,39 +136,46 @@ menu_system = MenuSystem()
 
 def create_main_menu():
     """Create the main interactive menu"""
+
     def search_handler():
         """Handle search and link choice"""
         from ..interactive import search_and_link_wizard
+
         search_and_link_wizard()
         return True
 
     def update_handler():
         """Handle catalog update choice"""
         from ..interactive import update_catalog_wizard
+
         update_catalog_wizard()
         return True
 
     def recent_handler():
         """Handle recent downloads choice"""
         from ..interactive import recent_downloads_scanner
+
         recent_downloads_scanner()
         return True
 
     def browse_handler():
         """Handle folder browsing choice"""
         from ..interactive import folder_batch_wizard
+
         folder_batch_wizard()
         return True
 
     def settings_handler():
         """Handle settings choice"""
         from ..interactive import settings_menu
+
         settings_menu()
         return True
 
     def help_handler():
         """Handle help choice"""
         from ..interactive import show_interactive_help
+
         show_interactive_help()
         return True
 
@@ -178,19 +190,19 @@ def create_main_menu():
         return "quick"
 
     menu_system.add_menu(
-        'main',
-        'HARDBOUND - Audiobook Manager',
+        "main",
+        "HARDBOUND - Audiobook Manager",
         {
-            '1': ('🔍 Search & Link Books', search_handler),
-            '2': ('📊 Update Catalog', update_handler),
-            '3': ('🔗 Link Recent Downloads', recent_handler),
-            '4': ('📁 Browse by Folder', browse_handler),
-            '5': ('⚙️  Settings & Preferences', settings_handler),
-            '6': ('❓ Help & Tutorial', help_handler),
-            'Q': ('⚡ Quick Actions', quick_actions_handler),
-            '7': ('🚪 Exit', exit_handler)
+            "1": ("🔍 Search & Link Books", search_handler),
+            "2": ("📊 Update Catalog", update_handler),
+            "3": ("🔗 Link Recent Downloads", recent_handler),
+            "4": ("📁 Browse by Folder", browse_handler),
+            "5": ("⚙️  Settings & Preferences", settings_handler),
+            "6": ("❓ Help & Tutorial", help_handler),
+            "Q": ("⚡ Quick Actions", quick_actions_handler),
+            "7": ("🚪 Exit", exit_handler),
         },
-        width=45
+        width=45,
     )
 
 
@@ -200,18 +212,21 @@ def create_quick_actions_menu():
     def quick_search_handler():
         """Quick search and link"""
         from ..interactive import search_and_link_wizard
+
         search_and_link_wizard()
         return True
 
     def quick_recent_handler():
         """Quick process recent downloads"""
         from ..interactive import recent_downloads_scanner
+
         recent_downloads_scanner()
         return True
 
     def quick_browse_handler():
         """Quick browse library"""
         from ..interactive import folder_batch_wizard
+
         folder_batch_wizard()
         return True
 
@@ -226,14 +241,14 @@ def create_quick_actions_menu():
         return False
 
     menu_system.add_menu(
-        'quick',
-        'Quick Actions',
+        "quick",
+        "Quick Actions",
         {
-            '1': ('🔍 Search & Link', quick_search_handler),
-            '2': ('📥 Process Recent', quick_recent_handler),
-            '3': ('📚 Browse Library', quick_browse_handler),
-            '4': ('⚙️  More Options...', more_options_handler),
-            '0': ('🚪 Exit', quick_exit_handler)
+            "1": ("🔍 Search & Link", quick_search_handler),
+            "2": ("📥 Process Recent", quick_recent_handler),
+            "3": ("📚 Browse Library", quick_browse_handler),
+            "4": ("⚙️  More Options...", more_options_handler),
+            "0": ("🚪 Exit", quick_exit_handler),
         },
-        width=35
+        width=35,
     )

@@ -1,6 +1,8 @@
 """Input validation and path handling utilities"""
+
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
+
 from rich.console import Console
 
 # Global console instance
@@ -20,7 +22,9 @@ class PathValidator:
 
         if not path.exists():
             console.print(f"[yellow]⚠️  Path does not exist: {path}[/yellow]")
-            console.print(f"[cyan]💡 Tip: Check if the path is mounted or spelled correctly[/cyan]")
+            console.print(
+                f"[cyan]💡 Tip: Check if the path is mounted or spelled correctly[/cyan]"
+            )
             return None
 
         if not path.is_dir():
@@ -40,7 +44,9 @@ class PathValidator:
 
         # Check if parent exists
         if not path.parent.exists():
-            console.print(f"[yellow]⚠️  Parent directory does not exist: {path.parent}[/yellow]")
+            console.print(
+                f"[yellow]⚠️  Parent directory does not exist: {path.parent}[/yellow]"
+            )
             console.print(f"[cyan]💡 Tip: Create the parent directory first[/cyan]")
             return None
 
@@ -77,6 +83,7 @@ class PathValidator:
             siblings = [p.name for p in path.parent.iterdir() if p.is_dir()]
             # Find similar names
             import difflib
+
             matches = difflib.get_close_matches(path.name, siblings, n=3, cutoff=0.6)
             suggestions.extend([str(path.parent / match) for match in matches])
 
@@ -87,7 +94,9 @@ class InputValidator:
     """Input validation utilities"""
 
     @staticmethod
-    def get_choice(prompt: str, valid_choices: List[str], default: Optional[str] = None) -> Optional[str]:
+    def get_choice(
+        prompt: str, valid_choices: List[str], default: Optional[str] = None
+    ) -> Optional[str]:
         """Get validated choice from user"""
         while True:
             if default:
@@ -108,7 +117,9 @@ class InputValidator:
                     if valid.lower().startswith(choice.lower()):
                         return valid
 
-            console.print(f"[yellow]⚠️  Invalid choice. Valid options: {', '.join(valid_choices)}[/yellow]")
+            console.print(
+                f"[yellow]⚠️  Invalid choice. Valid options: {', '.join(valid_choices)}[/yellow]"
+            )
 
     @staticmethod
     def get_path(prompt: str, must_exist: bool = True) -> Optional[Path]:
@@ -135,7 +146,9 @@ class InputValidator:
                     console.print(f"   {i}. {suggestion}")
 
                 if InputValidator.get_choice("Use suggestion?", ["y", "n"]) == "y":
-                    choice = InputValidator.get_choice("Which one?", [str(i) for i in range(1, len(suggestions) + 1)])
+                    choice = InputValidator.get_choice(
+                        "Which one?", [str(i) for i in range(1, len(suggestions) + 1)]
+                    )
                     if choice and choice.isdigit():
                         return Path(suggestions[int(choice) - 1])
 
@@ -151,7 +164,12 @@ class InputValidator:
         return response in ["y", "yes", "true", "1"]
 
     @staticmethod
-    def get_number(prompt: str, min_val: Optional[int] = None, max_val: Optional[int] = None, default: Optional[int] = None) -> Optional[int]:
+    def get_number(
+        prompt: str,
+        min_val: Optional[int] = None,
+        max_val: Optional[int] = None,
+        default: Optional[int] = None,
+    ) -> Optional[int]:
         """Get validated number input"""
         while True:
             if default is not None:

@@ -1,11 +1,13 @@
 """Text formatting and display utilities"""
-from typing import List, Dict, Any
+
 from pathlib import Path
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.text import Text
+from typing import Any, Dict, List
+
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 console = Console()
 
@@ -48,7 +50,7 @@ class TextFormatter:
         """Truncate text to max length with suffix"""
         if len(text) <= max_length:
             return text
-        return text[:max_length - len(suffix)] + suffix
+        return text[: max_length - len(suffix)] + suffix
 
     @staticmethod
     def format_path_list(paths: List[Path], max_items: int = 5) -> str:
@@ -91,14 +93,18 @@ class DisplayFormatter:
         return table
 
     @staticmethod
-    def create_info_panel(title: str, content: Dict[str, Any], style: str = "blue") -> Panel:
+    def create_info_panel(
+        title: str, content: Dict[str, Any], style: str = "blue"
+    ) -> Panel:
         """Create an information panel"""
         content_lines = []
         for key, value in content.items():
             content_lines.append(f"[bold]{key}:[/bold] {value}")
 
         content_text = "\n".join(content_lines)
-        return Panel.fit(content_text, title=f"[{style}]{title}[/{style}]", border_style=style)
+        return Panel.fit(
+            content_text, title=f"[{style}]{title}[/{style}]", border_style=style
+        )
 
     @staticmethod
     def format_status_message(status: str, message: str, icon: str = "") -> Text:
@@ -107,16 +113,11 @@ class DisplayFormatter:
             "success": "green",
             "error": "red",
             "warning": "yellow",
-            "info": "blue"
+            "info": "blue",
         }
 
         style = status_styles.get(status.lower(), "white")
-        icon_map = {
-            "success": "✅",
-            "error": "❌",
-            "warning": "⚠️",
-            "info": "ℹ️"
-        }
+        icon_map = {"success": "✅", "error": "❌", "warning": "⚠️", "info": "ℹ️"}
 
         icon = icon or icon_map.get(status.lower(), "")
         return Text(f"{icon} {message}", style=style)

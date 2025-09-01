@@ -7,6 +7,7 @@ import re
 import sys
 from pathlib import Path
 from typing import Dict, Optional
+
 from rich.console import Console
 
 from .display import Sty, row
@@ -143,7 +144,9 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
                 stats["replaced"] += 1
             except OSError as e:
                 row("💥", Sty.RED, "err", src, dst, dry_run)
-                print(f"\x1b[31m    {e}\x1b[0m", file=sys.stderr)  # Keep ANSI for stderr
+                print(
+                    f"\x1b[31m    {e}\x1b[0m", file=sys.stderr
+                )  # Keep ANSI for stderr
                 stats["errors"] += 1
         return
 

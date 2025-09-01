@@ -3,16 +3,17 @@
 Audiobook catalog management with enhanced search and caching
 """
 
+import hashlib
+import os
+import re
 import sqlite3
 import time
-import os
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
-import hashlib
-import re
+from pathlib import Path
 from time import perf_counter
+from typing import Any, Callable, Dict, List, Optional, Set
+
 from rich.console import Console
 
 from .display import Sty
@@ -273,7 +274,9 @@ class AudiobookCatalog:
 
         return "Unknown"
 
-    def index_directory(self, root: Path, verbose: bool = False, progress_callback=None):
+    def index_directory(
+        self, root: Path, verbose: bool = False, progress_callback=None
+    ):
         """Index or update a directory tree"""
         if verbose:
             console.print(f"[yellow]Indexing {root}...[/yellow]")
@@ -381,7 +384,9 @@ class AudiobookCatalog:
 
         return results
 
-    def get_autocomplete_suggestions(self, partial_query: str, limit: int = 10) -> List[str]:
+    def get_autocomplete_suggestions(
+        self, partial_query: str, limit: int = 10
+    ) -> List[str]:
         """Get autocomplete suggestions for partial queries"""
         if not partial_query or len(partial_query.strip()) < 2:
             return []
@@ -395,7 +400,7 @@ class AudiobookCatalog:
             ORDER BY rank
             LIMIT ?
             """,
-            (partial_query, limit // 3)
+            (partial_query, limit // 3),
         )
         title_suggestions = [row[0] for row in cursor.fetchall()]
 
@@ -407,7 +412,7 @@ class AudiobookCatalog:
             ORDER BY author
             LIMIT ?
             """,
-            (partial_query, limit // 3)
+            (partial_query, limit // 3),
         )
         author_suggestions = [row[0] for row in cursor.fetchall()]
 
@@ -419,7 +424,7 @@ class AudiobookCatalog:
             ORDER BY series
             LIMIT ?
             """,
-            (partial_query, limit // 3)
+            (partial_query, limit // 3),
         )
         series_suggestions = [row[0] for row in cursor.fetchall()]
 
@@ -439,7 +444,7 @@ class AudiobookCatalog:
         try:
             history_file = Path.home() / ".cache" / "hardbound" / "search_history.txt"
             if history_file.exists():
-                with open(history_file, 'r', encoding='utf-8') as f:
+                with open(history_file, "r", encoding="utf-8") as f:
                     lines = f.readlines()
                     # Return most recent searches
                     return [line.strip() for line in lines[-limit:] if line.strip()]
@@ -456,7 +461,7 @@ class AudiobookCatalog:
             # Read existing history
             history = []
             if history_file.exists():
-                with open(history_file, 'r', encoding='utf-8') as f:
+                with open(history_file, "r", encoding="utf-8") as f:
                     history = [line.strip() for line in f.readlines() if line.strip()]
 
             # Remove duplicate if exists
@@ -471,8 +476,8 @@ class AudiobookCatalog:
             history = history[:max_history]
 
             # Write back
-            with open(history_file, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(history))
+            with open(history_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(history))
 
         except Exception:
             # Silently ignore history recording errors
@@ -748,7 +753,11 @@ class AudiobookCatalog:
                 if all(v is not False for v in results.values() if v is not None)
                 else "❌ ISSUES FOUND"
             )
-            color = "[green]" if all(v is not False for v in results.values() if v is not None) else "[red]"
+            color = (
+                "[green]"
+                if all(v is not False for v in results.values() if v is not None)
+                else "[red]"
+            )
             console.print(f"{color}{status}[/{color}]")
 
         return results
@@ -759,7 +768,9 @@ class AudiobookCatalog:
         """Generate cache key for search results"""
         return hashlib.md5(f"{query}:{limit}".encode()).hexdigest()
 
-    def search_with_cache(self, query: str, limit: int = 500, use_cache: bool = True) -> List[Dict]:
+    def search_with_cache(
+        self, query: str, limit: int = 500, use_cache: bool = True
+    ) -> List[Dict]:
         """Search with optional caching for repeated queries"""
         if not use_cache:
             return self.search(query, limit)
@@ -767,7 +778,7 @@ class AudiobookCatalog:
         cache_key = self._cached_search_hash(query, limit)
 
         # Simple in-memory cache (could be enhanced with TTL)
-        if not hasattr(self, '_search_cache'):
+        if not hasattr(self, "_search_cache"):
             self._search_cache = {}
 
         if cache_key in self._search_cache:
@@ -777,9 +788,13 @@ class AudiobookCatalog:
         self._search_cache[cache_key] = results
         return results
 
-    def index_directory_parallel(self, directory: Path, verbose: bool = True,
-                               progress_callback: Optional[Callable] = None,
-                               max_workers: int = 4) -> int:
+    def index_directory_parallel(
+        self,
+        directory: Path,
+        verbose: bool = True,
+        progress_callback: Optional[Callable] = None,
+        max_workers: int = 4,
+    ) -> int:
         """Index directory with parallel processing for better performance"""
         if not directory.exists():
             raise ValueError(f"Directory does not exist: {directory}")
@@ -791,11 +806,15 @@ class AudiobookCatalog:
         audio_files = []
         for root, dirs, files in os.walk(directory):
             for file in files:
-                if file.lower().endswith(('.mp3', '.m4a', '.m4b', '.flac', '.ogg', '.wma')):
+                if file.lower().endswith(
+                    (".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma")
+                ):
                     audio_files.append(Path(root) / file)
 
         if verbose:
-            console.print(f"[cyan]📁 Found {len(audio_files)} audio files to process[/cyan]")
+            console.print(
+                f"[cyan]📁 Found {len(audio_files)} audio files to process[/cyan]"
+            )
 
         # Process files in parallel
         processed = 0
@@ -816,15 +835,21 @@ class AudiobookCatalog:
                         processed += 1
 
                         if progress_callback:
-                            progress_callback(f"Processed {processed}/{len(audio_files)} files")
+                            progress_callback(
+                                f"Processed {processed}/{len(audio_files)} files"
+                            )
 
                 except Exception as e:
                     if verbose:
-                        console.print(f"[yellow]⚠️  Error processing {audio_file}: {e}[/yellow]")
+                        console.print(
+                            f"[yellow]⚠️  Error processing {audio_file}: {e}[/yellow]"
+                        )
 
         elapsed = time.time() - start_time
         if verbose:
-            console.print(f"[green]✅ Indexed {total_files} audiobooks in {elapsed:.1f}s[/green]")
+            console.print(
+                f"[green]✅ Indexed {total_files} audiobooks in {elapsed:.1f}s[/green]"
+            )
 
         return total_files
 
@@ -837,18 +862,22 @@ class AudiobookCatalog:
             meta = self.parse_audiobook_path(directory)
             if meta:
                 # Calculate stats for this directory
-                total_size = sum(f.stat().st_size for f in directory.iterdir() if f.is_file())
+                total_size = sum(
+                    f.stat().st_size for f in directory.iterdir() if f.is_file()
+                )
                 file_count = len(list(directory.iterdir()))
                 mtime = directory.stat().st_mtime
 
                 # Add computed fields
                 metadata = dict(meta)  # type: ignore
-                metadata.update({
-                    'path': str(directory),
-                    'size': str(total_size),  # Convert to string for database
-                    'file_count': str(file_count),
-                    'mtime': str(mtime)
-                })
+                metadata.update(
+                    {
+                        "path": str(directory),
+                        "size": str(total_size),  # Convert to string for database
+                        "file_count": str(file_count),
+                        "mtime": str(mtime),
+                    }
+                )
 
                 # Insert into database
                 self.conn.execute(
@@ -858,16 +887,16 @@ class AudiobookCatalog:
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
-                        meta.get('author', ''),
-                        meta.get('series', ''),
-                        meta.get('book', ''),
-                        meta['path'],
-                        meta.get('asin', ''),
-                        meta['mtime'],
-                        meta['size'],
-                        meta['file_count'],
-                        meta.get('title', '')
-                    )
+                        meta.get("author", ""),
+                        meta.get("series", ""),
+                        meta.get("book", ""),
+                        meta["path"],
+                        meta.get("asin", ""),
+                        meta["mtime"],
+                        meta["size"],
+                        meta["file_count"],
+                        meta.get("title", ""),
+                    ),
                 )
                 self.conn.commit()
                 return True
@@ -877,7 +906,7 @@ class AudiobookCatalog:
 
     def clear_cache(self):
         """Clear search cache"""
-        if hasattr(self, '_search_cache'):
+        if hasattr(self, "_search_cache"):
             self._search_cache.clear()
         self._cached_search_hash.cache_clear()
 

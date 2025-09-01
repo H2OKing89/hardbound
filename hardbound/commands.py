@@ -661,7 +661,11 @@ class AudiobookCatalog:
                 if all(v is not False for v in results.values() if v is not None)
                 else "❌ ISSUES FOUND"
             )
-            color = "green" if all(v is not False for v in results.values() if v is not None) else "red"
+            color = (
+                "green"
+                if all(v is not False for v in results.values() if v is not None)
+                else "red"
+            )
             console.print(f"[{color}]{status}[/{color}]")
 
         return results
@@ -928,8 +932,10 @@ def text_search_browser(catalog: AudiobookCatalog) -> List[str]:
     search_history = []
     if history_file.exists():
         try:
-            with open(history_file, 'r', encoding='utf-8') as f:
-                search_history = [line.strip() for line in f.readlines() if line.strip()]
+            with open(history_file, "r", encoding="utf-8") as f:
+                search_history = [
+                    line.strip() for line in f.readlines() if line.strip()
+                ]
         except Exception:
             pass  # Ignore history loading errors
 
@@ -950,8 +956,8 @@ def text_search_browser(catalog: AudiobookCatalog) -> List[str]:
         search_history.insert(0, query)
         search_history = search_history[:50]  # Keep last 50 searches
         try:
-            with open(history_file, 'w', encoding='utf-8') as f:
-                f.write('\n'.join(search_history))
+            with open(history_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(search_history))
         except Exception:
             pass  # Ignore history saving errors
 
@@ -984,9 +990,7 @@ def text_search_browser(catalog: AudiobookCatalog) -> List[str]:
                 display = f"{author} ▸ {title}"
 
             indicator = "📘" if book.get("has_m4b") else "🎵"
-            print(
-                f"[green]{i:3d}[/green]) {display} {indicator} ({size_mb:.0f}MB)"
-            )
+            print(f"[green]{i:3d}[/green]) {display} {indicator} ({size_mb:.0f}MB)")
 
         nav_options = []
         if current_page > 0:
@@ -1026,12 +1030,14 @@ def _get_autocomplete_suggestions(catalog: AudiobookCatalog) -> List[str]:
 
     # Get some recent/popular authors and series
     try:
-        cursor = catalog.conn.execute("""
+        cursor = catalog.conn.execute(
+            """
             SELECT author, series, book FROM items
             WHERE author != 'Unknown'
             ORDER BY mtime DESC
             LIMIT 100
-        """)
+        """
+        )
 
         for row in cursor.fetchall():
             author = row[0]
@@ -1046,7 +1052,7 @@ def _get_autocomplete_suggestions(catalog: AudiobookCatalog) -> List[str]:
                 # Add first few words of book title
                 words = book.split()[:3]
                 if len(words) >= 2:
-                    suggestions.add(' '.join(words))
+                    suggestions.add(" ".join(words))
 
     except Exception:
         pass  # Ignore errors
@@ -1515,9 +1521,7 @@ def search_and_link_wizard():
 
     # Offer choice of browse vs search
     print("\nHow would you like to find audiobooks?")
-    print(
-        f"  [green]1[/green]) Browse by author (recommended for large libraries)"
-    )
+    print(f"  [green]1[/green]) Browse by author (recommended for large libraries)")
     print(f"  [green]2[/green]) Search by text")
     print(f"  [green]3[/green]) Show recent audiobooks")
 
@@ -1642,9 +1646,7 @@ def banner(title: str, mode: str):
     line = "─" * max(4, w - 2)
     label = f"[bold][cyan] {title} [/cyan][/bold]"
     mode_tag = (
-        f"[yellow][DRY-RUN][/yellow]"
-        if mode == "dry"
-        else f"[green][COMMIT][/green]"
+        f"[yellow][DRY-RUN][/yellow]" if mode == "dry" else f"[green][COMMIT][/green]"
     )
     console.print(f"┌{line}┐")
     console.print(f"│ {label}{mode_tag}".ljust(w - 1) + "│")
