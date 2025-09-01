@@ -1018,7 +1018,10 @@ def fzf_pick(candidates: List[Dict], multi: bool = True) -> List[str]:
                 return results
 
         temp_catalog = AudiobookCatalog()
-        return hierarchical_browser(temp_catalog)
+        try:
+            return hierarchical_browser(temp_catalog)
+        finally:
+            temp_catalog.close()
 
     # Build searchable lines with metadata
     lines = []
@@ -2225,7 +2228,3 @@ def settings_menu():
     print(f"{Sty.YELLOW}Use config.json file directly for now{Sty.RESET}")
 
     input(f"\n{Sty.YELLOW}Press Enter to continue...{Sty.RESET}")
-
-
-# Import hierarchical_browser from interactive module
-from .interactive import hierarchical_browser

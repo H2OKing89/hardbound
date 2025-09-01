@@ -6,7 +6,7 @@ setup(
     packages=find_packages(),
     entry_points={
         "console_scripts": [
-            "hardbound=hardbound.hardbound:main",
+            "hardbound=hardbound:main",
         ],
     },
     python_requires=">=3.8",
