@@ -7,15 +7,12 @@ import sqlite3
 import time
 import os
 from pathlib import Path
-from typing import List, Dict, Optional, Set, Callable
+from typing import Any, Dict, List, Optional, Set, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 import hashlib
 import re
-import sqlite3
-from pathlib import Path
 from time import perf_counter
-from typing import Any, Dict, List, Optional
 from rich.console import Console
 
 from .display import Sty

@@ -27,13 +27,13 @@ class TextFormatter:
             size /= 1024
             size_index += 1
 
-        return ".1f"
+        return f"{size:.1f} {size_names[size_index]}"
 
     @staticmethod
     def format_duration(seconds: float) -> str:
         """Format duration in human readable format"""
         if seconds < 60:
-            return ".1f"
+            return f"{seconds:.1f}s"
         elif seconds < 3600:
             minutes = int(seconds // 60)
             secs = seconds % 60

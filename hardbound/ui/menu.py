@@ -1,5 +1,6 @@
 """Unified menu system with Rich for perfect Unicode handling"""
 import re
+import unicodedata
 from typing import Dict, Callable, Optional
 from rich.console import Console
 from rich.table import Table
@@ -107,9 +108,6 @@ class MenuSystem:
                     return True
 
         return True
-import re
-import unicodedata
-from typing import Dict, Callable, Optional
 
 
 def display_width(text: str) -> int:
