@@ -6,6 +6,7 @@ from rich.table import Table
 from rich.panel import Panel
 from rich import box
 from ..display import Sty
+from .feedback import VisualFeedback
 
 
 class MenuSystem:
@@ -172,8 +173,8 @@ def create_main_menu():
 
     def exit_handler():
         """Handle exit choice"""
-        from ..ui.feedback import VisualFeedback
-        VisualFeedback.info("Goodbye!")
+        feedback = VisualFeedback()
+        feedback.info("Goodbye!")
         return False
 
     menu_system.add_menu(

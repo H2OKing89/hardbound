@@ -513,7 +513,8 @@ def interactive_mode():
 
     # Initialize catalog if needed
     if not DB_FILE.exists():
-        VisualFeedback.info("No catalog found. Building index...")
+        feedback = VisualFeedback()
+        feedback.info("No catalog found. Building index...")
 
         catalog = AudiobookCatalog()
         default_path = PathValidator.get_default_search_paths()
@@ -540,16 +541,19 @@ def interactive_mode():
                 running = False
 
         except KeyboardInterrupt:
-            VisualFeedback.info("Goodbye!")
+            feedback = VisualFeedback()
+            feedback.info("Goodbye!")
             running = False
         except Exception as e:
-            ErrorHandler.handle_operation_error(e, "menu operation")
+            error_handler = ErrorHandler()
+            error_handler.handle_operation_error(e, "menu operation")
             running = False
 
 
 def _first_run_setup(config):
     """Enhanced first run setup with validation"""
-    VisualFeedback.info_box(
+    feedback = VisualFeedback()
+    feedback.info_box(
         "Welcome to Hardbound!",
         {
             "Setup": "Let's configure your paths",
@@ -570,7 +574,8 @@ def _first_run_setup(config):
                 else:
                     continue
             else:
-                VisualFeedback.warning("No path provided", "You can set this later in Settings")
+                feedback = VisualFeedback()
+                feedback.warning("No path provided", "You can set this later in Settings")
                 break
         else:
             library_path = PathValidator.validate_library_path(path_str)
@@ -583,7 +588,8 @@ def _first_run_setup(config):
     while not dest_path:
         path_str = input(f"{Sty.CYAN}➤{Sty.RESET} Torrent destination root: ").strip()
         if not path_str:
-            VisualFeedback.warning("No destination provided", "You can set this later in Settings")
+            feedback = VisualFeedback()
+            feedback.warning("No destination provided", "You can set this later in Settings")
             break
 
         dest_path = PathValidator.validate_destination_path(path_str)
@@ -593,51 +599,11 @@ def _first_run_setup(config):
 
     config["first_run"] = False
     save_config(config)
-    VisualFeedback.success("Setup complete!", "Your preferences have been saved")
+    feedback = VisualFeedback()
+    feedback.success("Setup complete!", "Your preferences have been saved")
 
 
-# Progress indicator for long operations
-class ProgressIndicator:
-    """Visual progress feedback for long operations"""
-
-    def __init__(self, title: str, total: Optional[int] = None):
-        self.title = title
-        self.total = total
-        self.current = 0
-        self.start_time = None
-
-    def start(self):
-        """Start the progress indicator"""
-        import time
-        self.start_time = time.time()
-        print(f"{Sty.CYAN}⏳{Sty.RESET} {self.title}...")
-
-    def update(self, message: str = ""):
-        """Update progress"""
-        self.current += 1
-
-        if self.total:
-            VisualFeedback.progress_bar(self.current, self.total, message)
-        else:
-            frame = self.current % 10
-            VisualFeedback.spinner(frame, f"{self.title}: {message}")
-
-    def done(self, message: str = "Complete"):
-        """Mark as complete"""
-        if self.total:
-            VisualFeedback.progress_bar(self.total, self.total, message)
-
-        elapsed = None
-        if self.start_time:
-            import time
-            elapsed = time.time() - self.start_time
-
-        detail = ""
-        if elapsed:
-            detail = f"({elapsed:.1f}s)"
-
-        VisualFeedback.success(f"{self.title} {message}", detail)
-
+# Progress indicator for long operations - Now using Rich-based ProgressIndicator from ui.feedback
 
 def search_and_link_wizard():
     """Search-first linking wizard with hierarchical browsing"""
