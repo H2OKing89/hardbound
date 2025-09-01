@@ -30,7 +30,13 @@ dependencies = [
 
 [project.optional-dependencies]
 progress = ["tqdm>=4.64.0"]
-all = ["tqdm>=4.64.0"]
+testing = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "pytest-xdist>=3.0.0",
+]
+all = ["tqdm>=4.64.0", "pytest>=7.0.0", "pytest-cov>=4.0.0", "pytest-mock>=3.10.0", "pytest-xdist>=3.0.0"]
 
 [project.scripts]
 hardbound = "hardbound:main"
@@ -40,11 +46,34 @@ Homepage = "https://github.com/yourusername/hardbound"
 Repository = "https://github.com/yourusername/hardbound.git"
 Issues = "https://github.com/yourusername/hardbound/issues"
 
-[tool.setuptools]
-packages = []
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--tb=short",
+    "--strict-markers",
+    "--disable-warnings",
+    "--cov=hardbound",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-fail-under=80"
+]
 
-[tool.setuptools.package-dir]
-"" = "."
+[tool.coverage.run]
+source = ["hardbound"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "setup.py",
+]
 
-[tool.setuptools.package-data]
-hardbound = ["*.txt", "*.md"]
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]

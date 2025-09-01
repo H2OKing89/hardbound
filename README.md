@@ -247,6 +247,57 @@ Configure automatic linking of new downloads:
 4. Test thoroughly
 5. Submit a pull request
 
+## Development
+
+### Testing
+
+Hardbound includes a comprehensive test suite to ensure reliability and catch regressions.
+
+#### Running Tests
+
+```bash
+# Run all tests
+./run_tests.sh
+
+# Run with coverage report
+./run_tests.sh --coverage
+
+# Run specific test file
+python -m pytest tests/test_config.py -v
+
+# Run tests in parallel (requires pytest-xdist)
+python -m pytest tests/ -n auto
+```
+
+#### Test Structure
+
+- `tests/test_config.py`: Configuration management tests
+- `tests/test_display.py`: Display and formatting utilities tests
+- `tests/test_linker.py`: Core hardlinking functionality tests
+- `tests/test_main.py`: Main application and CLI tests
+
+#### Writing Tests
+
+Tests use pytest with the following conventions:
+- Test files: `test_*.py` or `*_test.py`
+- Test classes: `Test*`
+- Test functions: `test_*`
+- Fixtures and mocks for dependency isolation
+
+#### Coverage
+
+The test suite aims for high code coverage. Current coverage report:
+- Core utilities: ~90% coverage
+- Main business logic: ~10-20% coverage (room for improvement)
+
+### Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Write tests for new functionality
+4. Ensure all tests pass
+5. Submit a pull request
+
 ## License
 
 MIT License - see LICENSE file for details
