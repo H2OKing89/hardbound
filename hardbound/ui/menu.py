@@ -1,14 +1,20 @@
-"""Unified menu system for consistent navigation"""
+"""Unified menu system with Rich for perfect Unicode handling"""
+import re
 from typing import Dict, Callable, Optional
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich import box
 from ..display import Sty
 
 
 class MenuSystem:
-    """Standardized menu system with consistent navigation"""
+    """Standardized menu system with Rich for perfect Unicode display"""
 
     def __init__(self):
         self.menus: Dict[str, Dict] = {}
         self.current_menu: Optional[str] = None
+        self.console = Console()
 
     def add_menu(self, name: str, title: str, options: Dict[str, tuple], width: int = 50):
         """Add a menu with options
@@ -26,37 +32,42 @@ class MenuSystem:
         }
 
     def display_menu(self, name: str) -> Optional[str]:
-        """Display a menu and get user choice
+        """Display a menu using Rich for perfect alignment
 
         Returns:
             Selected choice or None if invalid
         """
         if name not in self.menus:
-            print(f"{Sty.RED}❌ Menu '{name}' not found{Sty.RESET}")
+            self.console.print(f"[red]❌ Menu '{name}' not found[/red]")
             return None
 
         menu = self.menus[name]
-        width = menu['width']
 
-        # Display header
-        print(f"\n{Sty.CYAN}╔{'═' * width}╗")
-        print(f"║ {menu['title'].center(width-2)} ║")
-        print(f"╠{'═' * width}╣{Sty.RESET}")
+        # Create table for menu items
+        table = Table.grid(padding=(0, 1))
+        table.add_column(justify="left")
 
-        # Display options
+        # Add menu items
         for choice, (label, _) in menu['options'].items():
-            print(f"║ {Sty.GREEN}{choice}{Sty.RESET}) {label}{' ' * (width - len(label) - len(choice) - 4)} ║")
+            table.add_row(f"[bold green]{choice})[/] {label}")
 
-        # Display footer
-        print(f"{Sty.CYAN}╚{'═' * width}╝{Sty.RESET}")
+        # Create panel with perfect borders
+        panel = Panel.fit(
+            table,
+            title=f"[bold cyan]{menu['title']}[/]",
+            box=box.DOUBLE,  # ╔═╦═╗ style
+            padding=(0, 2),
+            border_style="cyan"
+        )
 
+        self.console.print(panel)
         return self._get_choice(list(menu['options'].keys()))
 
     def _get_choice(self, valid_choices: list) -> Optional[str]:
         """Get and validate user choice"""
         while True:
             try:
-                choice = input(f"\n{Sty.CYAN}➤ Enter choice: {Sty.RESET}").strip().lower()
+                choice = self.console.input("[bold cyan]➤ Enter choice: [/]").strip().lower()
 
                 if not choice:
                     continue
@@ -71,10 +82,10 @@ class MenuSystem:
                         if valid.lower().startswith(choice):
                             return valid
 
-                print(f"{Sty.YELLOW}⚠️  Invalid choice. Please select from: {', '.join(valid_choices)}{Sty.RESET}")
+                self.console.print(f"[yellow]⚠️  Invalid choice. Please select from: {', '.join(valid_choices)}[/yellow]")
 
             except KeyboardInterrupt:
-                print(f"\n{Sty.CYAN}👋 Cancelled{Sty.RESET}")
+                self.console.print("[cyan]👋 Cancelled[/cyan]")
                 return None
             except EOFError:
                 return None
@@ -92,10 +103,29 @@ class MenuSystem:
                     result = handler()
                     return result if result is not None else True
                 except Exception as e:
-                    print(f"{Sty.RED}❌ Error: {e}{Sty.RESET}")
+                    self.console.print(f"[red]❌ Error: {e}[/red]")
                     return True
 
         return True
+import re
+import unicodedata
+from typing import Dict, Callable, Optional
+from ..display import Sty
+
+
+def display_width(text: str) -> int:
+    """Calculate the display width of text, accounting for full-width characters"""
+    # Remove ANSI codes first
+    clean_text = re.sub(r'\x1b\[[0-9;]*m', '', text)
+
+    width = 0
+    for char in clean_text:
+        # Check if character is full-width (East Asian Wide, Full-width, etc.)
+        if unicodedata.east_asian_width(char) in ('W', 'F', 'A'):
+            width += 2
+        else:
+            width += 1
+    return width
 
 
 # Global menu system instance
