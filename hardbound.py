@@ -8,9 +8,6 @@ from pathlib import Path
 from time import perf_counter
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple, Any, Union
-import hashlib
-import threading
-import time
 
 try:
     from tqdm import tqdm
@@ -43,9 +40,6 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 # Add near top with other paths
 DB_DIR = Path.home() / ".cache" / "hardbound"
 DB_FILE = DB_DIR / "catalog.db"
-BOOKMARKS_FILE = CONFIG_DIR / "bookmarks.json"
-HISTORY_FILE = CONFIG_DIR / "history.json"
-WATCH_FILE = CONFIG_DIR / "watch.json"
 
 class AudiobookCatalog:
     """SQLite FTS5 catalog for fast audiobook searching"""
@@ -70,20 +64,14 @@ class AudiobookCatalog:
                 size INTEGER,
                 file_count INTEGER,
                 has_m4b BOOLEAN,
-                has_mp3 BOOLEAN,
-                last_linked REAL,
-                link_count INTEGER DEFAULT 0,
-                tags TEXT,
-                rating INTEGER,
-                checksum TEXT
+                has_mp3 BOOLEAN
             );
             
             CREATE INDEX IF NOT EXISTS idx_mtime ON items(mtime DESC);
             CREATE INDEX IF NOT EXISTS idx_path ON items(path);
-            CREATE INDEX IF NOT EXISTS idx_last_linked ON items(last_linked DESC);
             
             CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
-                author, series, book, asin, tags,
+                author, series, book, asin,
                 content='items',
                 content_rowid='id'
             );
@@ -105,20 +93,9 @@ class AudiobookCatalog:
             CREATE TRIGGER IF NOT EXISTS items_ad AFTER DELETE ON items BEGIN
                 DELETE FROM items_fts WHERE rowid = old.id;
             END;
-            
-            CREATE TABLE IF NOT EXISTS link_history (
-                id INTEGER PRIMARY KEY,
-                source_path TEXT,
-                dest_path TEXT,
-                timestamp REAL,
-                action TEXT,
-                success BOOLEAN
-            );
-            
-            CREATE INDEX IF NOT EXISTS idx_history_time ON link_history(timestamp DESC);
         """)
         self.conn.commit()
-
+    
     def parse_audiobook_path(self, path: Path) -> Dict[str, str]:
         """Extract author/series/book from path structure"""
         parts = path.parts
@@ -229,153 +206,8 @@ class AudiobookCatalog:
         """)
         return dict(cursor.fetchone())
     
-    def get_dashboard_stats(self) -> Dict[str, Any]:
-        """Get comprehensive dashboard statistics"""
-        cursor = self.conn.execute("""
-            SELECT 
-                COUNT(*) as total,
-                COUNT(DISTINCT author) as authors,
-                COUNT(DISTINCT series) as series,
-                SUM(size) as total_size,
-                SUM(file_count) as total_files,
-                COUNT(CASE WHEN has_m4b THEN 1 END) as m4b_count,
-                COUNT(CASE WHEN has_mp3 THEN 1 END) as mp3_count,
-                COUNT(CASE WHEN last_linked IS NOT NULL THEN 1 END) as linked_count,
-                AVG(rating) as avg_rating
-            FROM items
-        """)
-        stats = dict(cursor.fetchone())
-        
-        # Get recent activity
-        cursor = self.conn.execute("""
-            SELECT * FROM link_history 
-            ORDER BY timestamp DESC 
-            LIMIT 10
-        """)
-        stats['recent_activity'] = [dict(row) for row in cursor.fetchall()]
-        
-        # Get top authors
-        cursor = self.conn.execute("""
-            SELECT author, COUNT(*) as count 
-            FROM items 
-            WHERE author IS NOT NULL AND author != '—'
-            GROUP BY author 
-            ORDER BY count DESC 
-            LIMIT 5
-        """)
-        stats['top_authors'] = [dict(row) for row in cursor.fetchall()]
-        
-        return stats
-    
-    def add_to_history(self, source: str, dest: str, action: str, success: bool):
-        """Add entry to link history"""
-        self.conn.execute("""
-            INSERT INTO link_history (source_path, dest_path, timestamp, action, success)
-            VALUES (?, ?, ?, ?, ?)
-        """, (source, dest, time.time(), action, success))
-        self.conn.commit()
-    
-    def update_link_stats(self, path: str):
-        """Update link statistics for an item"""
-        self.conn.execute("""
-            UPDATE items 
-            SET last_linked = ?, link_count = link_count + 1
-            WHERE path = ?
-        """, (time.time(), path))
-        self.conn.commit()
-
-class BookmarkManager:
-    """Manage bookmarks and favorites"""
-    
-    def __init__(self):
-        self.bookmarks = self._load_bookmarks()
-    
-    def _load_bookmarks(self) -> Dict[str, Any]:
-        if BOOKMARKS_FILE.exists():
-            try:
-                return json.loads(BOOKMARKS_FILE.read_text())
-            except:
-                pass
-        return {"favorites": [], "tags": {}}
-    
-    def save(self):
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        BOOKMARKS_FILE.write_text(json.dumps(self.bookmarks, indent=2))
-    
-    def add_favorite(self, path: str, name: str = None):
-        entry = {"path": path, "name": name or Path(path).name, "added": time.time()}
-        self.bookmarks["favorites"].append(entry)
-        self.save()
-    
-    def remove_favorite(self, path: str):
-        self.bookmarks["favorites"] = [
-            f for f in self.bookmarks["favorites"] 
-            if f["path"] != path
-        ]
-        self.save()
-    
-    def is_favorite(self, path: str) -> bool:
-        return any(f["path"] == path for f in self.bookmarks["favorites"])
-    
-    def get_favorites(self) -> List[Dict]:
-        return self.bookmarks["favorites"]
-    
-    def add_tag(self, path: str, tag: str):
-        if path not in self.bookmarks["tags"]:
-            self.bookmarks["tags"][path] = []
-        if tag not in self.bookmarks["tags"][path]:
-            self.bookmarks["tags"][path].append(tag)
-        self.save()
-
-class WatchManager:
-    """Manage watch folders for automatic linking"""
-    
-    def __init__(self):
-        self.config = self._load_config()
-        self.running = False
-        self.thread = None
-    
-    def _load_config(self) -> Dict:
-        if WATCH_FILE.exists():
-            try:
-                return json.loads(WATCH_FILE.read_text())
-            except:
-                pass
-        return {"folders": [], "interval": 300, "enabled": False}
-    
-    def save(self):
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        WATCH_FILE.write_text(json.dumps(self.config, indent=2))
-    
-    def add_folder(self, source: str, destination: str, pattern: str = "*"):
-        self.config["folders"].append({
-            "source": source,
-            "destination": destination,
-            "pattern": pattern,
-            "added": time.time()
-        })
-        self.save()
-    
-    def start(self):
-        if not self.running and self.config["enabled"]:
-            self.running = True
-            self.thread = threading.Thread(target=self._watch_loop, daemon=True)
-            self.thread.start()
-    
-    def stop(self):
-        self.running = False
-        if self.thread:
-            self.thread.join(timeout=1)
-    
-    def _watch_loop(self):
-        while self.running:
-            for folder in self.config["folders"]:
-                self._check_folder(folder)
-            time.sleep(self.config["interval"])
-    
-    def _check_folder(self, folder_config: Dict):
-        # Implementation for checking and auto-linking new audiobooks
-        pass
+    def close(self):
+        self.conn.close()
 
 def load_config():
     """Load configuration with sensible defaults"""
@@ -978,11 +810,6 @@ Let's set up your default paths:
         save_config(config)
         print(f"{Sty.GREEN}✅ Settings saved!{Sty.RESET}\n")
     
-    # Start watch manager if enabled
-    watch = WatchManager()
-    if watch.config.get('enabled'):
-        watch.start()
-    
     while True:
         print(f"""
 {Sty.CYAN}╔══════════════════════════════════════════════╗
@@ -991,625 +818,110 @@ Let's set up your default paths:
 
 What would you like to do?
 
-{Sty.GREEN}1{Sty.RESET}) 📊 Dashboard
-{Sty.GREEN}2{Sty.RESET}) 🔍 Search and link audiobooks
-{Sty.GREEN}3{Sty.RESET}) ⚡ Batch operations
-{Sty.GREEN}4{Sty.RESET}) 📊 Update catalog index
-{Sty.GREEN}5{Sty.RESET}) ⭐ Manage favorites
-{Sty.GREEN}6{Sty.RESET}) 👁️  Watch folders
-{Sty.GREEN}7{Sty.RESET}) 🔍 Find duplicates
-{Sty.GREEN}8{Sty.RESET}) ↩️  Undo last operation
-{Sty.GREEN}9{Sty.RESET}) ⚙️  Settings
-{Sty.GREEN}0{Sty.RESET}) 🚪 Exit
+{Sty.GREEN}1{Sty.RESET}) 🔍 Search and link audiobooks (recommended)
+{Sty.GREEN}2{Sty.RESET}) 📊 Update catalog index
+{Sty.GREEN}3{Sty.RESET}) 🔗 Link recent downloads
+{Sty.GREEN}4{Sty.RESET}) 📁 Browse by folder (legacy)
+{Sty.GREEN}5{Sty.RESET}) ⚙️  Settings & Preferences
+{Sty.GREEN}6{Sty.RESET}) ❓ Help & Tutorial
+{Sty.GREEN}7{Sty.RESET}) 🚪 Exit
 
 """)
-        choice = input("Enter your choice: ").strip()
+        choice = input("Enter your choice (1-7): ").strip()
         
         try:
             if choice == "1":
-                show_dashboard()
+                search_and_link_wizard()
             elif choice == "2":
-                catalog = AudiobookCatalog()
-                selected = enhanced_search_browser(catalog)
-                if selected:
-                    _link_selected_paths(selected)
-                catalog.close()
-            elif choice == "3":
-                batch_operations_wizard()
-            elif choice == "4":
                 update_catalog_wizard()
+            elif choice == "3":
+                recent_downloads_scanner()
+            elif choice == "4":
+                folder_batch_wizard()
             elif choice == "5":
-                manage_favorites_menu()
-            elif choice == "6":
-                watch_folders_manager()
-            elif choice == "7":
-                duplicate_finder()
-            elif choice == "8":
-                undo_last_operation()
-            elif choice == "9":
                 settings_menu()
-                config = load_config()
-            elif choice == "0" or choice.lower() in ['q', 'quit', 'exit']:
-                watch.stop()
+                config = load_config()  # Reload after settings change
+            elif choice == "6":
+                show_interactive_help()
+            elif choice == "7" or choice.lower() in ['q', 'quit', 'exit']:
                 print(f"{Sty.CYAN}👋 Goodbye!{Sty.RESET}")
                 break
             else:
-                print(f"{Sty.YELLOW}Please enter 0-9{Sty.RESET}")
+                print(f"{Sty.YELLOW}Please enter 1-7{Sty.RESET}")
         except KeyboardInterrupt:
-            watch.stop()
             print(f"\n{Sty.CYAN}👋 Goodbye!{Sty.RESET}")
             break
         except Exception as e:
             print(f"{Sty.RED}❌ Error: {e}{Sty.RESET}")
 
-def show_dashboard():
-    """Display comprehensive dashboard"""
+def search_and_link_wizard():
+    """Search-first linking wizard with hierarchical browsing"""
+    print(f"\n{Sty.CYAN}🔍 SEARCH AND LINK{Sty.RESET}")
+    
     catalog = AudiobookCatalog()
-    stats = catalog.get_dashboard_stats()
-    bookmarks = BookmarkManager()
     
-    print(f"""
-{Sty.CYAN}╔══════════════════════════════════════════════════════════════╗
-║                     📊 HARDBOUND DASHBOARD                      ║
-╚══════════════════════════════════════════════════════════════╝{Sty.RESET}
-
-{Sty.BOLD}📚 Library Overview{Sty.RESET}
-├─ Total Audiobooks: {Sty.GREEN}{stats['total']:,}{Sty.RESET}
-├─ Unique Authors: {stats['authors']}
-├─ Series: {stats['series']}
-├─ Total Size: {Sty.YELLOW}{stats['total_size'] / (1024**3):.1f} GB{Sty.RESET}
-├─ M4B Files: {stats['m4b_count']}
-└─ MP3 Collections: {stats['mp3_count']}
-
-{Sty.BOLD}🔗 Link Statistics{Sty.RESET}
-├─ Books Linked: {stats['linked_count']}
-└─ Average Rating: {'⭐' * int(stats.get('avg_rating', 0) or 0)}
-
-{Sty.BOLD}👤 Top Authors{Sty.RESET}""")
+    # Offer choice of browse vs search
+    print("\nHow would you like to find audiobooks?")
+    print(f"  {Sty.GREEN}1{Sty.RESET}) Browse by author (recommended for large libraries)")
+    print(f"  {Sty.GREEN}2{Sty.RESET}) Search by text")
+    print(f"  {Sty.GREEN}3{Sty.RESET}) Show recent audiobooks")
     
-    for author in stats['top_authors']:
-        print(f"├─ {author['author']}: {author['count']} books")
+    choice = input("\nChoice (1-3): ").strip()
     
-    if bookmarks.get_favorites():
-        print(f"\n{Sty.BOLD}⭐ Favorites{Sty.RESET}")
-        for fav in bookmarks.get_favorites()[:5]:
-            print(f"├─ {fav['name']}")
-    
-    if stats['recent_activity']:
-        print(f"\n{Sty.BOLD}📅 Recent Activity{Sty.RESET}")
-        for activity in stats['recent_activity'][:5]:
-            action_icon = "✅" if activity['success'] else "❌"
-            print(f"├─ {action_icon} {activity['action']} - {Path(activity['source_path']).name}")
-    
-    catalog.close()
-    
-    print(f"\n{Sty.YELLOW}Press Enter to continue...{Sty.RESET}")
-    input()
-
-def enhanced_search_browser(catalog: AudiobookCatalog) -> List[str]:
-    """Enhanced search with filters and sorting"""
-    print(f"\n{Sty.CYAN}🔍 ADVANCED SEARCH{Sty.RESET}")
-    
-    # Search options menu
-    print("""
-Search Options:
-  1) Simple text search
-  2) Author filter
-  3) Series filter  
-  4) Size range
-  5) File type (M4B/MP3)
-  6) Recently added
-  7) Most linked
-  8) Favorites only
-""")
-    
-    option = input("Select option (1-8): ").strip()
-    
-    query = "*"
-    if option == "1":
-        query = input("Enter search terms: ").strip()
-    elif option == "2":
-        author = input("Author name: ").strip()
-        query = f'author:"{author}"' if author else "*"
-    elif option == "3":
-        series = input("Series name: ").strip()
-        query = f'series:"{series}"' if series else "*"
-    elif option == "6":
-        # Custom query for recent items
-        cursor = catalog.conn.execute("""
-            SELECT * FROM items 
-            ORDER BY mtime DESC 
-            LIMIT 100
-        """)
-        results = [dict(row) for row in cursor.fetchall()]
-    elif option == "7":
-        # Most linked items
-        cursor = catalog.conn.execute("""
-            SELECT * FROM items 
-            WHERE link_count > 0
-            ORDER BY link_count DESC, last_linked DESC
-            LIMIT 100
-        """)
-        results = [dict(row) for row in cursor.fetchall()]
+    if choice == "1":
+        selected_paths = hierarchical_browser(catalog)
+    elif choice == "2":
+        selected_paths = text_search_browser(catalog)
+    elif choice == "3":
+        results = catalog.search("*", limit=50)
+        if results:
+            print(f"\n{Sty.GREEN}Recent audiobooks:{Sty.RESET}")
+            selected_paths = text_search_browser(catalog)
+        else:
+            print(f"{Sty.YELLOW}No audiobooks found{Sty.RESET}")
+            selected_paths = []
     else:
-        results = catalog.search(query, limit=500)
-    
-    if option not in ["6", "7"]:
-        results = catalog.search(query, limit=500)
-    
-    if not results:
-        print(f"{Sty.YELLOW}No results found{Sty.RESET}")
-        return []
-    
-    # Sorting options
-    print(f"\n{Sty.GREEN}Found {len(results)} results{Sty.RESET}")
-    print("Sort by: [N]ame, [A]uthor, [S]ize, [D]ate, [L]ink count")
-    sort = input("Choice: ").strip().lower()
-    
-    if sort == 'n':
-        results.sort(key=lambda x: x.get('book', ''))
-    elif sort == 'a':
-        results.sort(key=lambda x: x.get('author', ''))
-    elif sort == 's':
-        results.sort(key=lambda x: x.get('size', 0), reverse=True)
-    elif sort == 'd':
-        results.sort(key=lambda x: x.get('mtime', 0), reverse=True)
-    elif sort == 'l':
-        results.sort(key=lambda x: x.get('link_count', 0), reverse=True)
-    
-    # Display with enhanced information
-    bookmarks = BookmarkManager()
-    page_size = 20
-    current_page = 0
-    
-    while True:
-        start = current_page * page_size
-        end = min(start + page_size, len(results))
-        
-        print(f"\n{Sty.BOLD}Results {start+1}-{end} of {len(results)}{Sty.RESET}\n")
-        
-        for i, book in enumerate(results[start:end], start + 1):
-            author = book.get('author', '—')
-            series = book.get('series', '')
-            title = book.get('book', '—')
-            size_mb = book.get('size', 0) / (1024 * 1024)
-            link_count = book.get('link_count', 0)
-            
-            # Build display with indicators
-            if series:
-                display = f"{author} ▸ {series} ▸ {title}"
-            else:
-                display = f"{author} ▸ {title}"
-            
-            # Add status indicators
-            indicators = []
-            if book.get('has_m4b'):
-                indicators.append("📘")
-            elif book.get('has_mp3'):
-                indicators.append("🎵")
-            
-            if bookmarks.is_favorite(book['path']):
-                indicators.append("⭐")
-            
-            if link_count > 0:
-                indicators.append(f"🔗{link_count}")
-            
-            indicator_str = " ".join(indicators)
-            
-            print(f"{Sty.GREEN}{i:3d}{Sty.RESET}) {display} {indicator_str} ({size_mb:.0f}MB)")
-        
-        # Navigation with more options
-        nav_options = []
-        if current_page > 0:
-            nav_options.append("'p' = previous")
-        if end < len(results):
-            nav_options.append("'n' = next")
-        nav_options.append("numbers = select")
-        nav_options.append("'f+N' = toggle favorite")
-        nav_options.append("'all' = select all")
-        nav_options.append("'q' = quit")
-        
-        print(f"\n{Sty.YELLOW}{' | '.join(nav_options)}:{Sty.RESET}")
-        choice = input("Choice: ").strip().lower()
-        
-        if choice == 'q':
-            return []
-        elif choice == 'n' and end < len(results):
-            current_page += 1
-        elif choice == 'p' and current_page > 0:
-            current_page -= 1
-        elif choice.startswith('f+'):
-            # Toggle favorite
-            num = choice[2:]
-            if num.isdigit():
-                idx = int(num) - 1
-                if 0 <= idx < len(results):
-                    book = results[idx]
-                    if bookmarks.is_favorite(book['path']):
-                        bookmarks.remove_favorite(book['path'])
-                        print(f"{Sty.YELLOW}Removed from favorites{Sty.RESET}")
-                    else:
-                        bookmarks.add_favorite(book['path'], book.get('book'))
-                        print(f"{Sty.GREEN}Added to favorites{Sty.RESET}")
-        elif choice == 'all':
-            return [book['path'] for book in results]
-        else:
-            # Parse number selections
-            selected = []
-            for num in choice.split():
-                if num.isdigit():
-                    idx = int(num) - 1
-                    if 0 <= idx < len(results):
-                        selected.append(results[idx]['path'])
-            if selected:
-                return selected
-
-def batch_operations_wizard():
-    """Wizard for batch operations with templates"""
-    print(f"\n{Sty.CYAN}⚡ BATCH OPERATIONS{Sty.RESET}")
-    
-    templates = {
-        "1": {
-            "name": "Link all by author",
-            "description": "Link all books from a specific author"
-        },
-        "2": {
-            "name": "Link complete series",
-            "description": "Link all books in a series"
-        },
-        "3": {
-            "name": "Link favorites",
-            "description": "Link all bookmarked favorites"
-        },
-        "4": {
-            "name": "Link by size",
-            "description": "Link books within size range"
-        },
-        "5": {
-            "name": "Custom filter",
-            "description": "Create custom filter for batch"
-        }
-    }
-    
-    print("\nSelect batch template:")
-    for key, template in templates.items():
-        print(f"  {Sty.GREEN}{key}{Sty.RESET}) {template['name']}")
-        print(f"     {Sty.DIM}{template['description']}{Sty.RESET}")
-    
-    choice = input("\nChoice: ").strip()
-    
-    catalog = AudiobookCatalog()
-    selected_paths = []
-    
-    if choice == "1":
-        # By author
-        author = input("Author name: ").strip()
-        if author:
-            results = catalog.search(f'author:"{author}"', limit=500)
-            if results:
-                print(f"\n{Sty.GREEN}Found {len(results)} books by {author}{Sty.RESET}")
-                confirm = input("Link all? [y/N]: ").lower()
-                if confirm in ['y', 'yes']:
-                    selected_paths = [r['path'] for r in results]
-    
-    elif choice == "2":
-        # By series
-        series = input("Series name: ").strip()
-        if series:
-            results = catalog.search(f'series:"{series}"', limit=500)
-            if results:
-                print(f"\n{Sty.GREEN}Found {len(results)} books in {series}{Sty.RESET}")
-                for r in results:
-                    print(f"  • {r.get('book', '—')}")
-                confirm = input("\nLink all? [y/N]: ").lower()
-                if confirm in ['y', 'yes']:
-                    selected_paths = [r['path'] for r in results]
-    
-    elif choice == "3":
-        # Favorites
-        bookmarks = BookmarkManager()
-        favorites = bookmarks.get_favorites()
-        if favorites:
-            print(f"\n{Sty.GREEN}Found {len(favorites)} favorites{Sty.RESET}")
-            for fav in favorites:
-                print(f"  ⭐ {fav['name']}")
-            confirm = input("\nLink all? [y/N]: ").lower()
-            if confirm in ['y', 'yes']:
-                selected_paths = [f['path'] for f in favorites]
-    
-    elif choice == "4":
-        # By size
-        min_mb = input("Minimum size (MB): ").strip()
-        max_mb = input("Maximum size (MB): ").strip()
-        
-        min_size = int(min_mb) * 1024 * 1024 if min_mb.isdigit() else 0
-        max_size = int(max_mb) * 1024 * 1024 if max_mb.isdigit() else float('inf')
-        
-        results = catalog.search("*", limit=1000)
-        filtered = [r for r in results if min_size <= r.get('size', 0) <= max_size]
-        
-        if filtered:
-            print(f"\n{Sty.GREEN}Found {len(filtered)} books in size range{Sty.RESET}")
-            confirm = input("Link all? [y/N]: ").lower()
-            if confirm in ['y', 'yes']:
-                selected_paths = [r['path'] for r in filtered]
-    
-    catalog.close()
-    
-    if selected_paths:
-        _link_selected_paths(selected_paths)
-
-def undo_last_operation():
-    """Undo the last link operation"""
-    catalog = AudiobookCatalog()
-    
-    # Get last operation from history
-    cursor = catalog.conn.execute("""
-        SELECT * FROM link_history 
-        WHERE success = 1
-        ORDER BY timestamp DESC 
-        LIMIT 10
-    """)
-    
-    recent = [dict(row) for row in cursor.fetchall()]
-    
-    if not recent:
-        print(f"{Sty.YELLOW}No operations to undo{Sty.RESET}")
         catalog.close()
         return
     
-    print(f"\n{Sty.CYAN}Recent operations:{Sty.RESET}")
-    for i, op in enumerate(recent, 1):
-        timestamp = datetime.fromtimestamp(op['timestamp']).strftime("%Y-%m-%d %H:%M")
-        print(f"  {i}) {op['action']} - {Path(op['source_path']).name}")
-        print(f"     {Sty.DIM}Destination: {op['dest_path']}{Sty.RESET}")
-        print(f"     {Sty.DIM}Time: {timestamp}{Sty.RESET}")
-    
-    choice = input("\nSelect operation to undo (1-10): ").strip()
-    
-    if choice.isdigit():
-        idx = int(choice) - 1
-        if 0 <= idx < len(recent):
-            op = recent[idx]
-            dest = Path(op['dest_path'])
-            
-            if dest.exists():
-                confirm = input(f"\n{Sty.YELLOW}Remove {dest}? [y/N]: {Sty.RESET}").lower()
-                if confirm in ['y', 'yes']:
-                    try:
-                        if dest.is_file():
-                            dest.unlink()
-                        else:
-                            shutil.rmtree(dest)
-                        print(f"{Sty.GREEN}✅ Undone successfully{Sty.RESET}")
-                        catalog.add_to_history(op['source_path'], op['dest_path'], 'undo', True)
-                    except Exception as e:
-                        print(f"{Sty.RED}❌ Error: {e}{Sty.RESET}")
-            else:
-                print(f"{Sty.YELLOW}Destination no longer exists{Sty.RESET}")
-    
-    catalog.close()
-
-def watch_folders_manager():
-    """Manage watch folders for automatic linking"""
-    watch = WatchManager()
-    
-    while True:
-        print(f"""
-{Sty.CYAN}👁️  WATCH FOLDERS{Sty.RESET}
-
-Auto-link new audiobooks when they appear in watched folders.
-
-Current Status: {Sty.GREEN if watch.config['enabled'] else Sty.RED}{'ENABLED' if watch.config['enabled'] else 'DISABLED'}{Sty.RESET}
-Check Interval: {watch.config['interval']} seconds
-
-Watched Folders:""")
-        
-        if watch.config['folders']:
-            for i, folder in enumerate(watch.config['folders'], 1):
-                print(f"  {i}) {folder['source']} → {folder['destination']}")
-                print(f"     Pattern: {folder['pattern']}")
-        else:
-            print(f"  {Sty.DIM}No folders configured{Sty.RESET}")
-        
-        print(f"""
-Options:
-  1) Add watch folder
-  2) Remove watch folder
-  3) {'Disable' if watch.config['enabled'] else 'Enable'} watching
-  4) Change interval
-  5) Back to main menu
-""")
-        
-        choice = input("Choice: ").strip()
-        
-        if choice == "1":
-            source = input("Source folder to watch: ").strip()
-            dest = input("Destination for new audiobooks: ").strip()
-            
-            if source and dest:
-                watch.add_folder(source, dest)
-                print(f"{Sty.GREEN}✅ Added watch folder{Sty.RESET}")
-        
-        elif choice == "2":
-            if watch.config['folders']:
-                idx = input("Folder number to remove: ").strip()
-                if idx.isdigit():
-                    idx = int(idx) - 1
-                    if 0 <= idx < len(watch.config['folders']):
-                        del watch.config['folders'][idx]
-                        watch.save()
-                        print(f"{Sty.GREEN}✅ Removed{Sty.RESET}")
-        
-        elif choice == "3":
-            watch.config['enabled'] = not watch.config['enabled']
-            watch.save()
-            if watch.config['enabled']:
-                watch.start()
-            else:
-                watch.stop()
-        
-        elif choice == "4":
-            interval = input("Check interval in seconds (current: {}): ".format(
-                watch.config['interval']
-            )).strip()
-            if interval.isdigit():
-                watch.config['interval'] = int(interval)
-                watch.save()
-                print(f"{Sty.GREEN}✅ Updated interval{Sty.RESET}")
-        
-        elif choice == "5":
-            break
-
-def duplicate_finder():
-    """Find and manage duplicate audiobooks"""
-    print(f"\n{Sty.CYAN}🔍 DUPLICATE FINDER{Sty.RESET}")
-    
-    catalog = AudiobookCatalog()
-    
-    print("\nAnalyzing library for duplicates...")
-    
-    # Find duplicates by book name
-    cursor = catalog.conn.execute("""
-        SELECT book, author, COUNT(*) as count, GROUP_CONCAT(path, '||') as paths
-        FROM items
-        WHERE book IS NOT NULL AND book != '—'
-        GROUP BY book, author
-        HAVING COUNT(*) > 1
-        ORDER BY COUNT(*) DESC
-    """)
-    
-    duplicates = [dict(row) for row in cursor.fetchall()]
-    
-    if not duplicates:
-        print(f"{Sty.GREEN}No duplicates found!{Sty.RESET}")
+    if not selected_paths:
         catalog.close()
         return
     
-    print(f"\n{Sty.YELLOW}Found {len(duplicates)} potential duplicate sets{Sty.RESET}\n")
+    # Get destination
+    config = load_config()
+    default_dst = config.get("torrent_path", "")
     
-    for i, dup in enumerate(duplicates[:20], 1):
-        paths = dup['paths'].split('||')
-        print(f"{Sty.GREEN}{i}{Sty.RESET}) {dup['book']} by {dup['author']} ({dup['count']} copies)")
+    print(f"\n{Sty.BOLD}Destination root:{Sty.RESET}")
+    if default_dst:
+        print(f"Default: {default_dst}")
+        dst_input = input("Path (Enter for default): ").strip()
+        dst_root = Path(dst_input) if dst_input else Path(default_dst)
+    else:
+        dst_input = input("Path: ").strip()
+        if not dst_input:
+            catalog.close()
+            return
+        dst_root = Path(dst_input)
+    
+    # Preview and confirm
+    print(f"\n{Sty.YELLOW}Will link {len(selected_paths)} audiobook(s) to {dst_root}{Sty.RESET}")
+    confirm = input("Continue? [y/N]: ").lower()
+    
+    if confirm in ['y', 'yes']:
+        stats = {"linked":0, "replaced":0, "already":0, "exists":0, "excluded":0, "skipped":0, "errors":0}
+        zero_pad = bool(config.get("zero_pad", True))
+        also_cover = bool(config.get("also_cover", False))
         
-        for path in paths[:3]:
-            p = Path(path)
-            size_mb = p.stat().st_size / (1024 * 1024) if p.exists() else 0
-            print(f"   • {path} ({size_mb:.0f}MB)")
-        
-        if len(paths) > 3:
-            print(f"   ... and {len(paths) - 3} more")
-    
-    choice = input("\nSelect duplicate set to review (1-20): ").strip()
-    
-    if choice.isdigit():
-        idx = int(choice) - 1
-        if 0 <= idx < len(duplicates):
-            dup = duplicates[idx]
-            paths = dup['paths'].split('||')
+        for path_str in selected_paths:
+            src = Path(path_str)
+            base_name = zero_pad_vol(src.name) if zero_pad else src.name
+            dst = dst_root / base_name
             
-            print(f"\n{Sty.BOLD}Duplicate copies of: {dup['book']}{Sty.RESET}\n")
-            
-            for i, path in enumerate(paths, 1):
-                p = Path(path)
-                if p.exists():
-                    size = p.stat().st_size / (1024 * 1024)
-                    mtime = datetime.fromtimestamp(p.stat().st_mtime).strftime("%Y-%m-%d")
-                    file_count = len(list(p.iterdir()))
-                    
-                    print(f"{i}) {path}")
-                    print(f"   Size: {size:.0f}MB | Files: {file_count} | Modified: {mtime}")
-            
-            print(f"\n{Sty.YELLOW}Options: 'keep N' to keep only copy N, 'skip' to skip{Sty.RESET}")
-            action = input("Action: ").strip().lower()
-            
-            if action.startswith("keep "):
-                keep_idx = action.split()[1]
-                if keep_idx.isdigit():
-                    keep_idx = int(keep_idx) - 1
-                    if 0 <= keep_idx < len(paths):
-                        keep_path = paths[keep_idx]
-                        print(f"\n{Sty.YELLOW}This will remove other copies. Continue? [y/N]: {Sty.RESET}")
-                        if input().lower() in ['y', 'yes']:
-                            for i, path in enumerate(paths):
-                                if i != keep_idx:
-                                    print(f"Would remove: {path}")
-                                    # In production, actually remove: shutil.rmtree(Path(path))
-    
-    catalog.close()
-
-def update_catalog_wizard():
-    """Enhanced catalog update wizard with progress"""
-    print(f"\n{Sty.CYAN}📊 UPDATE CATALOG{Sty.RESET}")
-    
-    catalog = AudiobookCatalog()
-    
-    # Get current stats
-    stats = catalog.get_stats()
-    print(f"\nCurrent catalog: {stats['total']} audiobooks")
-    
-    # Default paths to index
-    default_paths = [
-        "/mnt/user/data/audio/audiobooks",
-        "/mnt/user/data/downloads",
-        Path.home() / "audiobooks",
-        Path.home() / "Downloads"
-    ]
-    
-    print("\nPaths to index:")
-    for i, path in enumerate(default_paths, 1):
-        exists = "✅" if Path(path).exists() else "❌"
-        print(f"  {i}) {exists} {path}")
-    
-    print(f"\n{Sty.YELLOW}Options:{Sty.RESET}")
-    print("  1) Quick update (modified in last 7 days)")
-    print("  2) Full reindex (slower but thorough)")
-    print("  3) Add custom path")
-    print("  4) Cancel")
-    
-    choice = input("\nChoice: ").strip()
-    
-    if choice == "1":
-        # Quick update - only check recently modified
-        print(f"\n{Sty.YELLOW}Quick updating...{Sty.RESET}")
-        count = 0
-        for path in default_paths:
-            if Path(path).exists():
-                # Only index items modified recently
-                count += catalog.index_directory(Path(path), verbose=True)
+            print(f"\nProcessing: {src.name}")
+            plan_and_link(src, dst, base_name, also_cover, zero_pad, False, False, stats)
         
-        print(f"\n{Sty.GREEN}✅ Added/updated {count} audiobooks{Sty.RESET}")
-    
-    elif choice == "2":
-        # Full reindex
-        print(f"\n{Sty.YELLOW}Full reindexing...{Sty.RESET}")
-        
-        # Clear existing data
-        confirm = input("Clear existing catalog? [y/N]: ").lower()
-        if confirm in ['y', 'yes']:
-            catalog.conn.execute("DELETE FROM items")
-            catalog.conn.commit()
-        
-        total = 0
-        for path in default_paths:
-            if Path(path).exists():
-                count = catalog.index_directory(Path(path), verbose=True)
-                total += count
-        
-        print(f"\n{Sty.GREEN}✅ Indexed {total} audiobooks{Sty.RESET}")
-    
-    elif choice == "3":
-        # Custom path
-        custom = input("Enter path to index: ").strip()
-        if custom and Path(custom).exists():
-            count = catalog.index_directory(Path(custom), verbose=True)
-            print(f"\n{Sty.GREEN}✅ Indexed {count} audiobooks{Sty.RESET}")
-    
-    # Show new stats
-    new_stats = catalog.get_stats()
-    if new_stats['total'] != stats['total']:
-        diff = new_stats['total'] - stats['total']
-        print(f"\nCatalog updated: {new_stats['total']} audiobooks ({'+' if diff > 0 else ''}{diff})")
+        summary_table(stats, perf_counter())
     
     catalog.close()
 
@@ -1821,10 +1133,6 @@ def plan_and_link(src_dir: Path,
                   force: bool,
                   dry_run: bool,
                   stats: dict):
-    
-    # Add to history tracking
-    catalog = AudiobookCatalog()
-    
     if zero_pad:
         base_name = zero_pad_vol(base_name)
 
