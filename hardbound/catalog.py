@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
 """
-Audiobook catalog and database management
+Audiobook catalog management with enhanced search and caching
 """
+
+import hashlib
+import os
 import re
 import sqlite3
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set
+
+from rich.console import Console
 
 from .display import Sty
+
+# Global console instance
+console = Console()
 
 # Database paths
 DB_DIR = Path.home() / ".cache" / "hardbound"
@@ -263,12 +274,27 @@ class AudiobookCatalog:
 
         return "Unknown"
 
-    def index_directory(self, root: Path, verbose: bool = False):
+    def index_directory(
+        self, root: Path, verbose: bool = False, progress_callback=None
+    ):
         """Index or update a directory tree"""
         if verbose:
-            print(f"{Sty.YELLOW}Indexing {root}...{Sty.RESET}")
+            console.print(f"[yellow]Indexing {root}...[/yellow]")
 
         count = 0
+        # First pass: count total directories to process
+        total_dirs = 0
+        for path in root.rglob("*"):
+            if path.is_dir():
+                m4b_files = list(path.glob("*.m4b"))
+                mp3_files = list(path.glob("*.mp3"))
+                if m4b_files or mp3_files:
+                    total_dirs += 1
+
+        if progress_callback and total_dirs > 0:
+            progress_callback.start()
+            progress_callback.total = total_dirs
+
         for path in root.rglob("*"):
             if not path.is_dir():
                 continue
@@ -310,42 +336,152 @@ class AudiobookCatalog:
             )
 
             count += 1
-            if verbose and count % 100 == 0:
+            if progress_callback:
+                progress_callback.update(f"Indexed {count}/{total_dirs} audiobooks")
+            elif verbose and count % 100 == 0:
                 print(f"  Indexed {count} audiobooks...")
 
         self.conn.commit()
 
-        if verbose:
-            print(f"{Sty.GREEN}✅ Indexed {count} audiobooks{Sty.RESET}")
+        if progress_callback:
+            progress_callback.done(f"Indexed {count} audiobooks")
+        elif verbose:
+            console.print(f"[green]✅ Indexed {count} audiobooks[/green]")
 
         return count
 
     def search(self, query: str, limit: int = 500) -> List[Dict]:
-        """Full-text search the catalog"""
+        """Full-text search the catalog with enhanced features"""
         if not query or query == "*":
             # Return recent items
             cursor = self.conn.execute(
                 """
-                SELECT * FROM items 
-                ORDER BY mtime DESC 
+                SELECT * FROM items
+                ORDER BY mtime DESC
                 LIMIT ?
             """,
                 (limit,),
             )
         else:
-            # FTS5 search
+            # FTS5 search with ranking
             cursor = self.conn.execute(
                 """
-                SELECT i.* FROM items i
+                SELECT i.*, f.rank
+                FROM items i
                 JOIN items_fts f ON i.id = f.rowid
                 WHERE items_fts MATCH ?
-                ORDER BY i.mtime DESC
+                ORDER BY f.rank, i.mtime DESC
                 LIMIT ?
             """,
                 (query, limit),
             )
 
-        return [dict(row) for row in cursor.fetchall()]
+        results = [dict(row) for row in cursor.fetchall()]
+
+        # Record search in history if it's a meaningful query
+        if query and query != "*" and len(query.strip()) > 2:
+            self._record_search_history(query)
+
+        return results
+
+    def get_autocomplete_suggestions(
+        self, partial_query: str, limit: int = 10
+    ) -> List[str]:
+        """Get autocomplete suggestions for partial queries"""
+        if not partial_query or len(partial_query.strip()) < 2:
+            return []
+
+        # Get suggestions from titles, authors, and series
+        cursor = self.conn.execute(
+            """
+            SELECT DISTINCT title as suggestion
+            FROM items_fts
+            WHERE title MATCH ? || '*'
+            ORDER BY rank
+            LIMIT ?
+            """,
+            (partial_query, limit // 3),
+        )
+        title_suggestions = [row[0] for row in cursor.fetchall()]
+
+        cursor = self.conn.execute(
+            """
+            SELECT DISTINCT author as suggestion
+            FROM items
+            WHERE author LIKE ? || '%'
+            ORDER BY author
+            LIMIT ?
+            """,
+            (partial_query, limit // 3),
+        )
+        author_suggestions = [row[0] for row in cursor.fetchall()]
+
+        cursor = self.conn.execute(
+            """
+            SELECT DISTINCT series as suggestion
+            FROM items
+            WHERE series LIKE ? || '%' AND series != ''
+            ORDER BY series
+            LIMIT ?
+            """,
+            (partial_query, limit // 3),
+        )
+        series_suggestions = [row[0] for row in cursor.fetchall()]
+
+        # Combine and deduplicate
+        all_suggestions = title_suggestions + author_suggestions + series_suggestions
+        seen = set()
+        unique_suggestions = []
+        for suggestion in all_suggestions:
+            if suggestion and suggestion not in seen:
+                unique_suggestions.append(suggestion)
+                seen.add(suggestion)
+
+        return unique_suggestions[:limit]
+
+    def get_search_history(self, limit: int = 20) -> List[str]:
+        """Get recent search history"""
+        try:
+            history_file = Path.home() / ".cache" / "hardbound" / "search_history.txt"
+            if history_file.exists():
+                with open(history_file, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                    # Return most recent searches
+                    return [line.strip() for line in lines[-limit:] if line.strip()]
+        except Exception:
+            pass
+        return []
+
+    def _record_search_history(self, query: str):
+        """Record a search query in history"""
+        try:
+            history_file = Path.home() / ".cache" / "hardbound" / "search_history.txt"
+            history_file.parent.mkdir(parents=True, exist_ok=True)
+
+            # Read existing history
+            history = []
+            if history_file.exists():
+                with open(history_file, "r", encoding="utf-8") as f:
+                    history = [line.strip() for line in f.readlines() if line.strip()]
+
+            # Remove duplicate if exists
+            if query in history:
+                history.remove(query)
+
+            # Add to beginning
+            history.insert(0, query)
+
+            # Keep only recent searches
+            max_history = 100
+            history = history[:max_history]
+
+            # Write back
+            with open(history_file, "w", encoding="utf-8") as f:
+                f.write("\n".join(history))
+
+        except Exception:
+            # Silently ignore history recording errors
+            pass
 
     def get_stats(self) -> Dict[str, int]:
         """Get catalog statistics"""
@@ -365,7 +501,7 @@ class AudiobookCatalog:
     def rebuild_indexes(self, verbose: bool = False) -> Dict[str, Any]:
         """Rebuild all database indexes for optimal performance"""
         if verbose:
-            print(f"{Sty.YELLOW}Rebuilding database indexes...{Sty.RESET}")
+            console.print(f"[yellow]Rebuilding database indexes...[/yellow]")
 
         start_time = perf_counter()
 
@@ -390,14 +526,14 @@ class AudiobookCatalog:
 
         elapsed = perf_counter() - start_time
         if verbose:
-            print(f"{Sty.GREEN}✅ Indexes rebuilt in {elapsed:.2f}s{Sty.RESET}")
+            console.print(f"[green]✅ Indexes rebuilt in {elapsed:.2f}s[/green]")
 
         return {"elapsed": elapsed}
 
     def clean_orphaned_entries(self, verbose: bool = False) -> Dict[str, int]:
         """Remove entries for audiobooks that no longer exist on disk"""
         if verbose:
-            print(f"{Sty.YELLOW}Cleaning orphaned catalog entries...{Sty.RESET}")
+            console.print(f"[yellow]Cleaning orphaned catalog entries...[/yellow]")
 
         cursor = self.conn.execute("SELECT id, path FROM items")
         orphaned = []
@@ -408,7 +544,7 @@ class AudiobookCatalog:
 
         if not orphaned:
             if verbose:
-                print(f"{Sty.GREEN}✅ No orphaned entries found{Sty.RESET}")
+                console.print(f"[green]✅ No orphaned entries found[/green]")
             return {"removed": 0, "checked": len(list(cursor))}
 
         # Remove orphaned entries
@@ -417,14 +553,14 @@ class AudiobookCatalog:
         self.conn.commit()
 
         if verbose:
-            print(f"{Sty.GREEN}✅ Removed {len(orphaned)} orphaned entries{Sty.RESET}")
+            console.print(f"[green]✅ Removed {len(orphaned)} orphaned entries[/green]")
 
         return {"removed": len(orphaned), "checked": len(list(cursor))}
 
     def optimize_database(self, verbose: bool = False) -> Dict[str, Any]:
         """Run database optimization routines"""
         if verbose:
-            print(f"{Sty.YELLOW}Optimizing database...{Sty.RESET}")
+            console.print(f"[yellow]Optimizing database...[/yellow]")
 
         start_time = perf_counter()
 
@@ -448,7 +584,7 @@ class AudiobookCatalog:
         elapsed = perf_counter() - start_time
 
         if verbose:
-            print(f"{Sty.GREEN}✅ Database optimized in {elapsed:.2f}s{Sty.RESET}")
+            console.print(f"[green]✅ Database optimized in {elapsed:.2f}s[/green]")
 
         return {
             "elapsed": elapsed,
@@ -550,7 +686,7 @@ class AudiobookCatalog:
     def vacuum_database(self, verbose: bool = False) -> Dict[str, int]:
         """Reclaim unused database space"""
         if verbose:
-            print(f"{Sty.YELLOW}Vacuuming database...{Sty.RESET}")
+            console.print(f"[yellow]Vacuuming database...[/yellow]")
 
         start_size = DB_FILE.stat().st_size if DB_FILE.exists() else 0
 
@@ -560,8 +696,8 @@ class AudiobookCatalog:
         space_saved = start_size - end_size
 
         if verbose:
-            print(
-                f"{Sty.GREEN}✅ Reclaimed {space_saved / (1024*1024):.1f} MB{Sty.RESET}"
+            console.print(
+                f"[green]✅ Reclaimed {space_saved / (1024*1024):.1f} MB[/green]"
             )
 
         return {"space_saved": space_saved, "final_size": end_size}
@@ -569,7 +705,7 @@ class AudiobookCatalog:
     def verify_integrity(self, verbose: bool = False) -> Dict[str, Any]:
         """Verify database integrity and FTS5 consistency"""
         if verbose:
-            print(f"{Sty.YELLOW}Verifying database integrity...{Sty.RESET}")
+            console.print(f"[yellow]Verifying database integrity...[/yellow]")
 
         results = {}
 
@@ -617,11 +753,162 @@ class AudiobookCatalog:
                 if all(v is not False for v in results.values() if v is not None)
                 else "❌ ISSUES FOUND"
             )
-            print(
-                f"{Sty.GREEN if all(v is not False for v in results.values() if v is not None) else Sty.RED}{status}{Sty.RESET}"
+            color = (
+                "[green]"
+                if all(v is not False for v in results.values() if v is not None)
+                else "[red]"
             )
+            console.print(f"{color}{status}[/{color}]")
 
         return results
+
+    # Performance optimization methods
+    @lru_cache(maxsize=100)
+    def _cached_search_hash(self, query: str, limit: int) -> str:
+        """Generate cache key for search results"""
+        return hashlib.md5(f"{query}:{limit}".encode()).hexdigest()
+
+    def search_with_cache(
+        self, query: str, limit: int = 500, use_cache: bool = True
+    ) -> List[Dict]:
+        """Search with optional caching for repeated queries"""
+        if not use_cache:
+            return self.search(query, limit)
+
+        cache_key = self._cached_search_hash(query, limit)
+
+        # Simple in-memory cache (could be enhanced with TTL)
+        if not hasattr(self, "_search_cache"):
+            self._search_cache = {}
+
+        if cache_key in self._search_cache:
+            return self._search_cache[cache_key]
+
+        results = self.search(query, limit)
+        self._search_cache[cache_key] = results
+        return results
+
+    def index_directory_parallel(
+        self,
+        directory: Path,
+        verbose: bool = True,
+        progress_callback: Optional[Callable] = None,
+        max_workers: int = 4,
+    ) -> int:
+        """Index directory with parallel processing for better performance"""
+        if not directory.exists():
+            raise ValueError(f"Directory does not exist: {directory}")
+
+        start_time = time.time()
+        total_files = 0
+
+        # Collect all audio files first
+        audio_files = []
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if file.lower().endswith(
+                    (".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma")
+                ):
+                    audio_files.append(Path(root) / file)
+
+        if verbose:
+            console.print(
+                f"[cyan]📁 Found {len(audio_files)} audio files to process[/cyan]"
+            )
+
+        # Process files in parallel
+        processed = 0
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_file = {
+                executor.submit(self._process_single_file, audio_file): audio_file
+                for audio_file in audio_files
+            }
+
+            # Process completed tasks
+            for future in as_completed(future_to_file):
+                audio_file = future_to_file[future]
+                try:
+                    result = future.result()
+                    if result:
+                        total_files += 1
+                        processed += 1
+
+                        if progress_callback:
+                            progress_callback(
+                                f"Processed {processed}/{len(audio_files)} files"
+                            )
+
+                except Exception as e:
+                    if verbose:
+                        console.print(
+                            f"[yellow]⚠️  Error processing {audio_file}: {e}[/yellow]"
+                        )
+
+        elapsed = time.time() - start_time
+        if verbose:
+            console.print(
+                f"[green]✅ Indexed {total_files} audiobooks in {elapsed:.1f}s[/green]"
+            )
+
+        return total_files
+
+    def _process_single_file(self, audio_file: Path) -> bool:
+        """Process a single audio file (for parallel processing)"""
+        try:
+            # For parallel processing, we need to handle directory-level metadata
+            # This is a simplified version - in practice, you'd want to group files by directory
+            directory = audio_file.parent
+            meta = self.parse_audiobook_path(directory)
+            if meta:
+                # Calculate stats for this directory
+                total_size = sum(
+                    f.stat().st_size for f in directory.iterdir() if f.is_file()
+                )
+                file_count = len(list(directory.iterdir()))
+                mtime = directory.stat().st_mtime
+
+                # Add computed fields
+                metadata = dict(meta)  # type: ignore
+                metadata.update(
+                    {
+                        "path": str(directory),
+                        "size": str(total_size),  # Convert to string for database
+                        "file_count": str(file_count),
+                        "mtime": str(mtime),
+                    }
+                )
+
+                # Insert into database
+                self.conn.execute(
+                    """
+                    INSERT OR REPLACE INTO items
+                    (author, series, book, path, asin, mtime, size, file_count, title)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        meta.get("author", ""),
+                        meta.get("series", ""),
+                        meta.get("book", ""),
+                        meta["path"],
+                        meta.get("asin", ""),
+                        meta["mtime"],
+                        meta["size"],
+                        meta["file_count"],
+                        meta.get("title", ""),
+                    ),
+                )
+                self.conn.commit()
+                return True
+        except Exception:
+            pass
+        return False
+
+    def clear_cache(self):
+        """Clear search cache"""
+        if hasattr(self, "_search_cache"):
+            self._search_cache.clear()
+        self._cached_search_hash.cache_clear()
 
     def close(self):
         self.conn.close()

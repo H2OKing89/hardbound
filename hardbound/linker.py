@@ -8,7 +8,12 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional
 
+from rich.console import Console
+
 from .display import Sty, row
+
+# Global console instance
+console = Console()
 
 # Exclusions
 EXCLUDE_DEST_NAMES = {"cover.jpg", "metadata.json"}
@@ -139,7 +144,9 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
                 stats["replaced"] += 1
             except OSError as e:
                 row("💥", Sty.RED, "err", src, dst, dry_run)
-                print(f"{Sty.RED}    {e}{Sty.RESET}", file=sys.stderr)
+                print(
+                    f"\x1b[31m    {e}\x1b[0m", file=sys.stderr
+                )  # Keep ANSI for stderr
                 stats["errors"] += 1
         return
 
@@ -160,7 +167,7 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
             stats["linked"] += 1
         except OSError as e:
             row("💥", Sty.RED, "err", src, dst, dry_run)
-            print(f"{Sty.RED}    {e}{Sty.RESET}", file=sys.stderr)
+            print(f"\x1b[31m    {e}\x1b[0m", file=sys.stderr)  # Keep ANSI for stderr
             stats["errors"] += 1
 
 
@@ -185,14 +192,14 @@ def plan_and_link(
         files = list(src_dir.iterdir())
     except FileNotFoundError:
         print(
-            f"{Sty.RED}[ERR] Source directory not found: {src_dir}{Sty.RESET}",
+            f"\x1b[31m[ERR] Source directory not found: {src_dir}\x1b[0m",
             file=sys.stderr,
         )
         stats["errors"] += 1
         return
 
     if not files:
-        print(f"{Sty.YELLOW}[WARN] No files found in {src_dir}{Sty.RESET}")
+        console.print(f"[yellow][WARN] No files found in {src_dir}[/yellow]")
         return
 
     # Categorize and normalize weird suffixes
@@ -274,16 +281,16 @@ def preflight_checks(src: Path, dst: Path) -> bool:
     """Run preflight checks before linking"""
     # Check if paths exist
     if not src.exists():
-        print(f"{Sty.RED}❌ Source doesn't exist: {src}{Sty.RESET}")
+        console.print(f"[red]❌ Source doesn't exist: {src}[/red]")
         return False
 
     # Check same filesystem
     try:
         if src.stat().st_dev != dst.parent.stat().st_dev:
-            print(f"{Sty.RED}❌ Cross-device link error{Sty.RESET}")
-            print(f"   Source and destination must be on same filesystem")
-            print(f"   Source: {src}")
-            print(f"   Dest:   {dst}")
+            console.print(f"[red]❌ Cross-device link error[/red]")
+            console.print(f"   Source and destination must be on same filesystem")
+            console.print(f"   Source: {src}")
+            console.print(f"   Dest:   {dst}")
             return False
     except FileNotFoundError:
         pass  # Destination doesn't exist yet, that's ok
@@ -293,8 +300,8 @@ def preflight_checks(src: Path, dst: Path) -> bool:
     if ("/mnt/user/" in src_str and "/mnt/disk" in dst_str) or (
         "/mnt/disk" in src_str and "/mnt/user/" in dst_str
     ):
-        print(f"{Sty.RED}❌ Unraid user/disk mixing detected{Sty.RESET}")
-        print(f"   Hardlinks won't work between /mnt/user and /mnt/disk paths")
+        console.print(f"[red]❌ Unraid user/disk mixing detected[/red]")
+        console.print(f"   Hardlinks won't work between /mnt/user and /mnt/disk paths")
         return False
 
     return True
@@ -321,8 +328,8 @@ def run_batch(batch_file: Path, also_cover, zero_pad, force, dry_run):
             try:
                 src_s, dst_s = [x.strip() for x in line.split("|", 1)]
             except ValueError:
-                print(
-                    f"{Sty.YELLOW}[WARN] bad line (expected 'SRC|DST'): {line}{Sty.RESET}"
+                console.print(
+                    f"[yellow][WARN] bad line (expected 'SRC|DST'): {line}[/yellow]"
                 )
                 continue
             src = Path(src_s)
