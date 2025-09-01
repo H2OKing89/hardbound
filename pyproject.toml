@@ -77,3 +77,6 @@ exclude_lines = [
     "raise AssertionError",
     "raise NotImplementedError",
 ]
+
+[tool.isort]
+profile = "black"
