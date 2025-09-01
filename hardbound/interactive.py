@@ -18,7 +18,10 @@ from .linker import plan_and_link, zero_pad_vol
 from .ui.menu import menu_system, create_main_menu
 from .ui.feedback import VisualFeedback, ErrorHandler, ProgressIndicator
 from .utils.validation import PathValidator, InputValidator
-from .utils.validation import PathValidator, InputValidator
+from rich.console import Console
+
+# Global Rich console for consistent output
+console = Console()
 
 
 def _get_recent_sources(config):
@@ -37,7 +40,7 @@ def have_fzf() -> bool:
 
 
 def hierarchical_browser(catalog) -> List[str]:
-    """Hierarchical browser for large audiobook collections - author-first approach"""
+    """Browse audiobooks by author/series hierarchy"""
 
     # Get all unique authors from catalog
     all_items = catalog.search("*", limit=5000)
@@ -65,8 +68,7 @@ def hierarchical_browser(catalog) -> List[str]:
             author_to_books[author] = []
         author_to_books[author].append(item)
 
-    # Step 1: Choose initial letter
-    print(f"\n{Sty.CYAN}📚 BROWSE BY AUTHOR{Sty.RESET}")
+    console.print("[cyan]📚 BROWSE BY AUTHOR[/cyan]")
     print(f"\nSelect first letter of author's name:\n")
 
     # Show initials with counts
@@ -78,25 +80,25 @@ def hierarchical_browser(catalog) -> List[str]:
             if i + j < len(initials):
                 initial = initials[i + j]
                 count = len(authors_by_initial[initial])
-                row.append(f"{Sty.GREEN}{initial}{Sty.RESET}({count:2d})")
+                row.append(f"[yellow]{initial}[/yellow]({count:2d})")
             else:
                 row.append("      ")
         print("  " + "  ".join(row))
 
-    print(f"\n{Sty.YELLOW}Enter letter(s), or 'search' for text search:{Sty.RESET}")
+    console.print(f"\n[yellow]Enter letter(s), or 'search' for text search:[/yellow]")
     choice = input("Choice: ").strip().upper()
 
     if choice.lower() == "search":
         return enhanced_text_search_browser(catalog)
 
     if not choice or choice not in authors_by_initial:
-        print(f"{Sty.YELLOW}Invalid selection{Sty.RESET}")
+        console.print(f"[yellow]Invalid selection[/yellow]")
         return []
 
     # Step 2: Choose author
     authors = sorted(authors_by_initial[choice])
 
-    print(f"\n{Sty.CYAN}Authors starting with '{choice}':{Sty.RESET}\n")
+    console.print(f"\n[cyan]Authors starting with '{choice}':[/cyan]\n")
 
     # Paginate if too many
     page_size = 20
@@ -108,8 +110,8 @@ def hierarchical_browser(catalog) -> List[str]:
 
         for i, author in enumerate(authors[start:end], start + 1):
             book_count = len(author_to_books[author])
-            print(
-                f"{Sty.GREEN}{i:3d}{Sty.RESET}) {author} ({book_count} book{'s' if book_count > 1 else ''})"
+            console.print(
+                f"[green]{i:3d}[/green]) {author} ({book_count} book{'s' if book_count > 1 else ''})"
             )
 
         nav_options = []
@@ -120,7 +122,7 @@ def hierarchical_browser(catalog) -> List[str]:
         nav_options.append("number = select")
         nav_options.append("'q' = quit")
 
-        print(f"\n{Sty.YELLOW}{' | '.join(nav_options)}:{Sty.RESET}")
+        console.print(f"\n[yellow]{' | '.join(nav_options)}:[/yellow]")
         choice = input("Choice: ").strip().lower()
 
         if choice == "q":
@@ -135,7 +137,7 @@ def hierarchical_browser(catalog) -> List[str]:
                 selected_author = authors[idx]
                 break
         else:
-            print(f"{Sty.YELLOW}Invalid selection{Sty.RESET}")
+            console.print(f"[yellow]Invalid selection[/yellow]")
 
     # Step 3: Browse author's books
     author_books = author_to_books[selected_author]
@@ -153,40 +155,40 @@ def hierarchical_browser(catalog) -> List[str]:
         else:
             standalone.append(book)
 
-    print(f"\n{Sty.CYAN}📚 {selected_author}{Sty.RESET}")
+    console.print(f"\n[cyan]📚 {selected_author}[/cyan]")
 
     all_selectable = []
 
     # Show series first
     if series_groups:
-        print(f"\n{Sty.BOLD}Series:{Sty.RESET}")
+        console.print(f"\n[bold]Series:[/bold]")
         for series in sorted(series_groups.keys()):
             books = sorted(series_groups[series], key=lambda x: x.get("book", ""))
-            print(f"\n  {Sty.MAGENTA}{series}{Sty.RESET} ({len(books)} books)")
+            console.print(f"\n  [magenta]{series}[/magenta] ({len(books)} books)")
             for book in books:
                 all_selectable.append(book)
                 idx = len(all_selectable)
                 size_mb = book.get("size", 0) / (1024 * 1024)
                 indicator = "📘" if book.get("has_m4b") else "🎵"
-                print(
-                    f"    {Sty.GREEN}{idx:3d}{Sty.RESET}) {book['book']} {indicator} ({size_mb:.0f}MB)"
+                console.print(
+                    f"    [green]{idx:3d}[/green]) {book['book']} {indicator} ({size_mb:.0f}MB)"
                 )
 
     # Show standalone books
     if standalone:
-        print(f"\n{Sty.BOLD}Standalone:{Sty.RESET}")
+        console.print(f"\n[bold]Standalone:[/bold]")
         for book in sorted(standalone, key=lambda x: x.get("book", "")):
             all_selectable.append(book)
             idx = len(all_selectable)
             size_mb = book.get("size", 0) / (1024 * 1024)
             indicator = "📘" if book.get("has_m4b") else "🎵"
-            print(
-                f"  {Sty.GREEN}{idx:3d}{Sty.RESET}) {book['book']} {indicator} ({size_mb:.0f}MB)"
+            console.print(
+                f"  [green]{idx:3d}[/green]) {book['book']} {indicator} ({size_mb:.0f}MB)"
             )
 
     # Selection
-    print(
-        f"\n{Sty.YELLOW}Enter numbers (space-separated), 'all', or 'q' to quit:{Sty.RESET}"
+    console.print(
+        f"\n[yellow]Enter numbers (space-separated), 'all', or 'q' to quit:[/yellow]"
     )
     choice = input("Selection: ").strip().lower()
 
@@ -204,9 +206,9 @@ def hierarchical_browser(catalog) -> List[str]:
         return selected
 
 
-def enhanced_text_search_browser(catalog: AudiobookCatalog) -> List[str]:
+def enhanced_text_search_browser(catalog) -> List[str]:
     """Enhanced text search browser with autocomplete and history"""
-    print(f"\n{Sty.CYAN}🔍 ENHANCED TEXT SEARCH{Sty.RESET}")
+    console.print(f"\n[cyan]🔍 ENHANCED TEXT SEARCH[/cyan]")
 
     # Load search history
     history_file = Path.home() / ".cache" / "hardbound" / "search_history.txt"
@@ -224,8 +226,8 @@ def enhanced_text_search_browser(catalog: AudiobookCatalog) -> List[str]:
     autocomplete_suggestions = _get_autocomplete_suggestions(catalog)
 
     print("\nEnter search terms (author, title, series):")
-    print(f"{Sty.DIM}💡 Type a few letters and press Tab for suggestions{Sty.RESET}")
-    print(f"{Sty.DIM}💡 Press ↑/↓ for search history{Sty.RESET}")
+    console.print(f"[dim]💡 Type a few letters and press Tab for suggestions[/dim]")
+    console.print(f"[dim]💡 Press ↑/↓ for search history[/dim]")
 
     query = _enhanced_input("Search: ", autocomplete_suggestions, search_history)
 
@@ -245,11 +247,11 @@ def enhanced_text_search_browser(catalog: AudiobookCatalog) -> List[str]:
     results = catalog.search(query, limit=100)
 
     if not results:
-        print(f"{Sty.YELLOW}No results found{Sty.RESET}")
-        print(f"{Sty.DIM}💡 Try different keywords or check spelling{Sty.RESET}")
+        console.print(f"[yellow]No results found[/yellow]")
+        console.print(f"[dim]💡 Try different keywords or check spelling[/dim]")
         return []
 
-    print(f"\n{Sty.GREEN}Found {len(results)} result(s):{Sty.RESET}\n")
+    console.print(f"\n[green]Found {len(results)} result(s):[/green]\n")
 
     # Display with pagination
     page_size = 20
@@ -271,8 +273,8 @@ def enhanced_text_search_browser(catalog: AudiobookCatalog) -> List[str]:
                 display = f"{author} ▸ {title}"
 
             indicator = "📘" if book.get("has_m4b") else "🎵"
-            print(
-                f"{Sty.GREEN}{i:3d}{Sty.RESET}) {display} {indicator} ({size_mb:.0f}MB)"
+            console.print(
+                f"[green]{i:3d}[/green]) {display} {indicator} ({size_mb:.0f}MB)"
             )
 
         nav_options = []
@@ -284,7 +286,7 @@ def enhanced_text_search_browser(catalog: AudiobookCatalog) -> List[str]:
         nav_options.append("'all' = select all")
         nav_options.append("'q' = quit")
 
-        print(f"\n{Sty.YELLOW}{' | '.join(nav_options)}:{Sty.RESET}")
+        console.print(f"\n[yellow]{' | '.join(nav_options)}:[/yellow]")
         choice = input("Choice: ").strip().lower()
 
         if choice == "q":
@@ -307,36 +309,60 @@ def enhanced_text_search_browser(catalog: AudiobookCatalog) -> List[str]:
                 return selected
 
 
-def _get_autocomplete_suggestions(catalog: AudiobookCatalog) -> List[str]:
+def _get_autocomplete_suggestions(catalog) -> List[str]:
     """Get autocomplete suggestions from catalog"""
     suggestions = set()
 
-    # Get some recent/popular authors and series
-    try:
-        cursor = catalog.conn.execute("""
-            SELECT author, series, book FROM items
-            WHERE author != 'Unknown'
-            ORDER BY mtime DESC
-            LIMIT 100
-        """)
+    # Check if this is a database-backed catalog
+    if hasattr(catalog, 'conn'):
+        # Database-backed catalog (AudiobookCatalog)
+        try:
+            cursor = catalog.conn.execute("""
+                SELECT author, series, book FROM items
+                WHERE author != 'Unknown'
+                ORDER BY mtime DESC
+                LIMIT 100
+            """)
 
-        for row in cursor.fetchall():
-            author = row[0]
-            series = row[1]
-            book = row[2]
+            for row in cursor.fetchall():
+                author = row[0]
+                series = row[1]
+                book = row[2]
 
-            if author and len(author) > 2:
-                suggestions.add(author)
-            if series and len(series) > 2:
-                suggestions.add(series)
-            if book and len(book) > 3:
-                # Add first few words of book title
-                words = book.split()[:3]
-                if len(words) >= 2:
-                    suggestions.add(' '.join(words))
+                if author and len(author) > 2:
+                    suggestions.add(author)
+                if series and len(series) > 2:
+                    suggestions.add(series)
+                if book and len(book) > 3:
+                    # Add first few words of book title
+                    words = book.split()[:3]
+                    if len(words) >= 2:
+                        suggestions.add(' '.join(words))
 
-    except Exception:
-        pass  # Ignore errors
+        except Exception:
+            pass  # Ignore errors
+    else:
+        # In-memory catalog (TempCatalog) - get suggestions from search results
+        try:
+            # Get a sample of items to build suggestions
+            items = catalog.search("*", limit=100)
+            for item in items:
+                author = item.get("author", "")
+                series = item.get("series", "")
+                book = item.get("book", "")
+
+                if author and len(author) > 2:
+                    suggestions.add(author)
+                if series and len(series) > 2:
+                    suggestions.add(series)
+                if book and len(book) > 3:
+                    # Add first few words of book title
+                    words = book.split()[:3]
+                    if len(words) >= 2:
+                        suggestions.add(' '.join(words))
+
+        except Exception:
+            pass  # Ignore errors
 
     return sorted(list(suggestions))
 
@@ -366,11 +392,11 @@ def fzf_pick(candidates: List[Dict], multi: bool = True) -> List[str]:
 
     if not have_fzf():
         # Use hierarchical browser instead of simple fallback
-        print(f"{Sty.YELLOW}fzf not found. Using hierarchical browser.{Sty.RESET}")
+        console.print(f"[yellow]fzf not found. Using hierarchical browser.[/yellow]")
 
         # Create a temporary catalog-like interface
         class TempCatalog:
-            def search(self, query, limit):
+            def search(self, query, limit=500):
                 if query == "*":
                     return candidates[:limit]
                 query_lower = query.lower()
@@ -471,7 +497,7 @@ def fzf_pick(candidates: List[Dict], multi: bool = True) -> List[str]:
         return paths
 
     except Exception as e:
-        print(f"{Sty.RED}fzf error: {e}{Sty.RESET}")
+        console.print(f"[red]fzf error: {e}[/red]")
         return fallback_picker(candidates, multi)
 
 
@@ -480,12 +506,12 @@ def fallback_picker(candidates: List[Dict], multi: bool) -> List[str]:
     if not candidates:
         return []
 
-    print(f"\n{Sty.CYAN}Select audiobook(s):{Sty.RESET}")
+    console.print(f"\n[cyan]Select audiobook(s):[/cyan]")
     for i, r in enumerate(candidates[:30], 1):
         author = r.get("author", "—")
         book = r.get("book", "—")
         print(f"{i:3d}) {author} - {book}")
-        print(f"      {Sty.DIM}{r['path']}{Sty.RESET}")
+        console.print(f"      [dim]{r['path']}[/dim]")
 
     if len(candidates) > 30:
         print(f"... and {len(candidates) - 30} more")
@@ -564,7 +590,7 @@ def _first_run_setup(config):
     # Library path setup
     library_path = None
     while not library_path:
-        path_str = input(f"{Sty.CYAN}➤{Sty.RESET} Audiobook library path: ").strip()
+        path_str = input(f"[cyan]➤[/cyan] Audiobook library path: ").strip()
         if not path_str:
             # Try to auto-detect
             defaults = PathValidator.get_default_search_paths()
@@ -586,7 +612,7 @@ def _first_run_setup(config):
     # Destination path setup
     dest_path = None
     while not dest_path:
-        path_str = input(f"{Sty.CYAN}➤{Sty.RESET} Torrent destination root: ").strip()
+        path_str = input(f"[cyan]➤[/cyan] Torrent destination root: ").strip()
         if not path_str:
             feedback = VisualFeedback()
             feedback.warning("No destination provided", "You can set this later in Settings")
@@ -607,17 +633,17 @@ def _first_run_setup(config):
 
 def search_and_link_wizard():
     """Search-first linking wizard with hierarchical browsing"""
-    print(f"\n{Sty.CYAN}🔍 SEARCH AND LINK{Sty.RESET}")
+    console.print(f"\n[cyan]🔍 SEARCH AND LINK[/cyan]")
 
     catalog = AudiobookCatalog()
 
     # Offer choice of browse vs search
     print("\nHow would you like to find audiobooks?")
-    print(
-        f"  {Sty.GREEN}1{Sty.RESET}) Browse by author (recommended for large libraries)"
+    console.print(
+        f"  [green]1[/green]) Browse by author (recommended for large libraries)"
     )
-    print(f"  {Sty.GREEN}2{Sty.RESET}) Search by text")
-    print(f"  {Sty.GREEN}3{Sty.RESET}) Show recent audiobooks")
+    console.print(f"  [green]2[/green]) Search by text")
+    console.print(f"  [green]3[/green]) Show recent audiobooks")
 
     choice = input("\nChoice (1-3): ").strip()
 
@@ -628,10 +654,10 @@ def search_and_link_wizard():
     elif choice == "3":
         results = catalog.search("*", limit=50)
         if results:
-            print(f"\n{Sty.GREEN}Recent audiobooks:{Sty.RESET}")
+            console.print(f"\n[green]Recent audiobooks:[/green]")
             selected_paths = enhanced_text_search_browser(catalog)
         else:
-            print(f"{Sty.YELLOW}No audiobooks found{Sty.RESET}")
+            console.print(f"[yellow]No audiobooks found[/yellow]")
             selected_paths = []
     else:
         catalog.close()
@@ -645,7 +671,7 @@ def search_and_link_wizard():
     config = load_config()
     default_dst = config.get("torrent_path", "")
 
-    print(f"\n{Sty.BOLD}Destination root:{Sty.RESET}")
+    console.print(f"\n[bold]Destination root:[/bold]")
     if default_dst:
         print(f"Default: {default_dst}")
         dst_input = input("Path (Enter for default): ").strip()
@@ -658,8 +684,8 @@ def search_and_link_wizard():
         dst_root = Path(dst_input)
 
     # Preview and confirm
-    print(
-        f"\n{Sty.YELLOW}Will link {len(selected_paths)} audiobook(s) to {dst_root}{Sty.RESET}"
+    console.print(
+        f"\n[yellow]Will link {len(selected_paths)} audiobook(s) to {dst_root}[/yellow]"
     )
     confirm = input("Continue? [y/N]: ").lower()
 
@@ -693,14 +719,14 @@ def search_and_link_wizard():
 
 def update_catalog_wizard():
     """Wizard for updating the catalog"""
-    print(f"\n{Sty.CYAN}📚 UPDATE CATALOG WIZARD{Sty.RESET}")
+    console.print(f"\n[cyan]📚 UPDATE CATALOG WIZARD[/cyan]")
 
     catalog = AudiobookCatalog()
 
     # Step 1: Choose update method
-    print(f"\n{Sty.BOLD}Choose update method:{Sty.RESET}")
-    print(f"  {Sty.GREEN}1{Sty.RESET}) Update from library path (recommended)")
-    print(f"  {Sty.GREEN}2{Sty.RESET}) Manual directory selection")
+    console.print(f"\n[bold]Choose update method:[/bold]")
+    console.print(f"  [green]1[/green]) Update from library path (recommended)")
+    console.print(f"  [green]2[/green]) Manual directory selection")
 
     choice = input("Choice (1-2): ").strip()
 
@@ -710,14 +736,14 @@ def update_catalog_wizard():
         library_path = Path(str(config.get("library_path", "")))
 
         if not library_path.exists():
-            print(f"{Sty.RED}❌ Library path not found: {library_path}{Sty.RESET}")
+            console.print(f"[red]❌ Library path not found: {library_path}[/red]")
             catalog.close()
             return
 
         print(f"\n📂 Scanning library path: {library_path}")
         progress = ProgressIndicator("Indexing audiobooks")
         count = catalog.index_directory(library_path, verbose=False, progress_callback=progress)
-        print(f"{Sty.GREEN}✅ Indexed {count} audiobooks{Sty.RESET}")
+        console.print(f"[green]✅ Indexed {count} audiobooks[/green]")
     elif choice == "2":
         # Manual directory selection
         root = Path(input("Enter directory path: ").strip())
@@ -725,18 +751,18 @@ def update_catalog_wizard():
             print(f"\n📂 Scanning directory: {root}")
             progress = ProgressIndicator("Indexing audiobooks")
             count = catalog.index_directory(root, verbose=False, progress_callback=progress)
-            print(f"{Sty.GREEN}✅ Indexed {count} audiobooks{Sty.RESET}")
+            console.print(f"[green]✅ Indexed {count} audiobooks[/green]")
         else:
-            print(f"{Sty.RED}❌ Invalid directory: {root}{Sty.RESET}")
+            console.print(f"[red]❌ Invalid directory: {root}[/red]")
     else:
-        print(f"{Sty.YELLOW}Invalid selection{Sty.RESET}")
+        console.print(f"[yellow]Invalid selection[/yellow]")
 
     catalog.close()
 
 
 def recent_downloads_scanner():
     """Find and link recently downloaded audiobooks"""
-    print(f"\n{Sty.CYAN}🔍 RECENT DOWNLOADS SCANNER{Sty.RESET}")
+    console.print(f"\n[cyan]🔍 RECENT DOWNLOADS SCANNER[/cyan]")
 
     # Check if catalog exists
     if DB_FILE.exists():
@@ -760,11 +786,11 @@ def recent_downloads_scanner():
     ).strip()
     hours = int(hours) if hours.isdigit() else 24
 
-    print(f"\n{Sty.YELLOW}Scanning filesystem...{Sty.RESET}")
+    console.print(f"\n[yellow]Scanning filesystem...[/yellow]")
     recent = find_recent_audiobooks(hours=hours)
 
     if not recent:
-        print(f"{Sty.YELLOW}No recent audiobooks found{Sty.RESET}")
+        console.print(f"[yellow]No recent audiobooks found[/yellow]")
         return
 
     # Convert to dict format for picker
@@ -786,39 +812,39 @@ def recent_downloads_scanner():
 
 def folder_batch_wizard():
     """Legacy folder batch wizard - kept for compatibility"""
-    print(
-        f"\n{Sty.YELLOW}Note: For large libraries, use 'Search and link' instead{Sty.RESET}"
+    console.print(
+        f"\n[yellow]Note: For large libraries, use 'Search and link' instead[/yellow]"
     )
-    print(f"{Sty.CYAN}📁 FOLDER BATCH LINKER (Legacy){Sty.RESET}")
+    console.print(f"[cyan]📁 FOLDER BATCH LINKER (Legacy)[/cyan]")
 
     config = load_config()
 
     # Use directory browser
-    print(f"\n{Sty.BOLD}Choose folder containing audiobooks:{Sty.RESET}")
+    console.print(f"\n[bold]Choose folder containing audiobooks:[/bold]")
     src_folder = browse_directory_tree()
     if not src_folder:
         return
 
     # Find audiobook subdirectories
     audiobook_dirs = []
-    print(f"\n{Sty.YELLOW}Scanning for audiobooks...{Sty.RESET}")
+    console.print(f"\n[yellow]Scanning for audiobooks...[/yellow]")
 
     try:
         for item in src_folder.iterdir():
             if item.is_dir() and (any(item.glob("*.m4b")) or any(item.glob("*.mp3"))):
                 audiobook_dirs.append(item)
     except PermissionError:
-        print(f"{Sty.RED}❌ Permission denied{Sty.RESET}")
+        console.print(f"[red]❌ Permission denied[/red]")
         return
 
     if not audiobook_dirs:
         if any(src_folder.glob("*.m4b")) or any(src_folder.glob("*.mp3")):
             audiobook_dirs = [src_folder]
         else:
-            print(f"{Sty.RED}No audiobooks found{Sty.RESET}")
+            console.print(f"[red]No audiobooks found[/red]")
             return
 
-    print(f"\n{Sty.GREEN}Found {len(audiobook_dirs)} audiobook(s){Sty.RESET}")
+    console.print(f"\n[green]Found {len(audiobook_dirs)} audiobook(s)[/green]")
 
     # Process with existing logic
     default_dst = config.get("torrent_path", "")
@@ -860,19 +886,19 @@ def settings_menu():
     """Settings and preferences menu"""
     config = load_config()
 
-    print(f"\n{Sty.CYAN}⚙️ SETTINGS MENU{Sty.RESET}")
+    console.print(f"\n[cyan]⚙️ SETTINGS MENU[/cyan]")
 
     while True:
         print(
             f"""
-{Sty.YELLOW}Current settings:{Sty.RESET}
+[yellow]Current settings:[/yellow]
   Library path: {config.get('library_path', '')}
   Torrent path: {config.get('torrent_path', '')}
   Zero pad: {config.get('zero_pad', True)}
   Also cover: {config.get('also_cover', False)}
   Recent sources: {', '.join(_get_recent_sources(config)[:5])}
 
-{Sty.GREEN}Options:{Sty.RESET}
+[green]Options:[/green]
   1) Change library path
   2) Change torrent path
   3) Toggle zero padding
@@ -889,21 +915,21 @@ def settings_menu():
             new_path = input("Enter new library path: ").strip()
             if new_path:
                 config["library_path"] = new_path
-                print(f"{Sty.GREEN}Library path updated.{Sty.RESET}")
+                console.print(f"[green]Library path updated.[/green]")
         elif choice == "2":
             new_path = input("Enter new torrent path: ").strip()
             if new_path:
                 config["torrent_path"] = new_path
-                print(f"{Sty.GREEN}Torrent path updated.{Sty.RESET}")
+                console.print(f"[green]Torrent path updated.[/green]")
         elif choice == "3":
             config["zero_pad"] = not config.get("zero_pad", True)
-            print(
-                f"{Sty.GREEN}Zero padding {'enabled' if config['zero_pad'] else 'disabled'}.{Sty.RESET}"
+            console.print(
+                f"[green]Zero padding {'enabled' if config['zero_pad'] else 'disabled'}.[/green]"
             )
         elif choice == "4":
             config["also_cover"] = not config.get("also_cover", False)
-            print(
-                f"{Sty.GREEN}Cover linking {'enabled' if config['also_cover'] else 'disabled'}.{Sty.RESET}"
+            console.print(
+                f"[green]Cover linking {'enabled' if config['also_cover'] else 'disabled'}.[/green]"
             )
         elif choice == "5":
             source = input("Enter source path to add: ").strip()
@@ -913,7 +939,7 @@ def settings_menu():
             if source and source not in recent_sources:
                 recent_sources.append(source)
                 config["recent_sources"] = recent_sources
-                print(f"{Sty.GREEN}Source added to recent sources.{Sty.RESET}")
+                console.print(f"[green]Source added to recent sources.[/green]")
         elif choice == "6":
             source = input("Enter source path to remove: ").strip()
             recent_sources = config.get("recent_sources", [])
@@ -922,7 +948,7 @@ def settings_menu():
             if source and source in recent_sources:
                 recent_sources.remove(source)
                 config["recent_sources"] = recent_sources
-                print(f"{Sty.GREEN}Source removed from recent sources.{Sty.RESET}")
+                console.print(f"[green]Source removed from recent sources.[/green]")
         elif choice == "7":
             # Reset to default settings
             config = {
@@ -933,11 +959,11 @@ def settings_menu():
                 "also_cover": False,
                 "recent_sources": [],
             }
-            print(f"{Sty.GREEN}Settings reset to default.{Sty.RESET}")
+            console.print(f"[green]Settings reset to default.[/green]")
         elif choice == "8":
             break
         else:
-            print(f"{Sty.RED}Invalid choice, please try again.{Sty.RESET}")
+            console.print(f"[red]Invalid choice, please try again.[/red]")
 
     save_config(config)
 
@@ -946,27 +972,27 @@ def show_interactive_help():
     """Show help for interactive mode"""
     print(
         f"""
-{Sty.CYAN}❓ HARDBOUND HELP{Sty.RESET}
+[cyan]❓ HARDBOUND HELP[/cyan]
 
-{Sty.BOLD}What does Hardbound do?{Sty.RESET}
+[bold]What does Hardbound do?[/bold]
 Creates hardlinks from your audiobook library to torrent folders.
 This saves space while letting you seed without duplicating files.
 
-{Sty.BOLD}Search-first workflow (NEW!):{Sty.RESET}
+[bold]Search-first workflow (NEW!):[/bold]
   hardbound index              # Build catalog (1500+ books → instant search)
   hardbound search "rowling"   # Find books instantly  
   hardbound select -m          # Interactive multi-select with fzf
 
-{Sty.BOLD}Classic commands:{Sty.RESET}
+[bold]Classic commands:[/bold]
   hardbound --src /path/book --dst /path/dest  # Single book
   hardbound --src /path/book --dst-root /root  # Auto-create dest folder
 
-{Sty.BOLD}Safety:{Sty.RESET}
+[bold]Safety:[/bold]
 • Defaults to dry-run (preview) mode
 • Use --commit to actually create links
 • Checks that source and destination are on same filesystem
 
-{Sty.YELLOW}Press Enter to continue...{Sty.RESET}"""
+[yellow]Press Enter to continue...[/yellow]"""
     )
     input()
 
@@ -1025,7 +1051,7 @@ def _link_selected_paths(selected_paths: List[str]):
     config = load_config()
     default_dst = config.get("torrent_path", "")
 
-    print(f"\n{Sty.BOLD}Destination root:{Sty.RESET}")
+    console.print(f"\n[bold]Destination root:[/bold]")
     if default_dst:
         print(f"Default: {default_dst}")
         dst_input = input("Path (Enter for default): ").strip()
@@ -1036,8 +1062,8 @@ def _link_selected_paths(selected_paths: List[str]):
             return
         dst_root = Path(dst_input)
 
-    print(
-        f"\n{Sty.YELLOW}Link {len(selected_paths)} audiobook(s)? [y/N]: {Sty.RESET}",
+    console.print(
+        f"\n[yellow]Link {len(selected_paths)} audiobook(s)? [y/N]: [/yellow]",
         end="",
     )
     if input().strip().lower() not in ["y", "yes"]:
@@ -1059,7 +1085,7 @@ def _link_selected_paths(selected_paths: List[str]):
         src = Path(path_str)
         base_name = zero_pad_vol(src.name) if zero_pad else src.name
         dst_dir = dst_root / base_name
-        print(f"\n{Sty.CYAN}Processing: {src.name}{Sty.RESET}")
+        console.print(f"\n[cyan]Processing: {src.name}[/cyan]")
         plan_and_link(
             src, dst_dir, base_name, also_cover, zero_pad, False, False, stats
         )
@@ -1072,7 +1098,7 @@ def browse_directory_tree():
     current = Path.cwd()
 
     while True:
-        print(f"\n{Sty.CYAN}📁 Current: {current}{Sty.RESET}")
+        console.print(f"\n[cyan]📁 Current: {current}[/cyan]")
 
         items = []
         try:
@@ -1087,7 +1113,7 @@ def browse_directory_tree():
                     marker = " 🎵" if has_audio else ""
                     items.append((f"[D] {item.name}{marker}", item))
         except PermissionError:
-            print(f"{Sty.RED}Permission denied{Sty.RESET}")
+            console.print(f"[red]Permission denied[/red]")
 
         for i, (display, path) in enumerate(items[:20], 1):
             print(f"  {i:2d}) {display}")
@@ -1095,8 +1121,8 @@ def browse_directory_tree():
         if len(items) > 20:
             print(f"  ... and {len(items) - 20} more")
 
-        print(
-            f"\n{Sty.YELLOW}Enter number to navigate, 'select' to choose current, 'back' to go up:{Sty.RESET}"
+        console.print(
+            f"\n[yellow]Enter number to navigate, 'select' to choose current, 'back' to go up:[/yellow]"
         )
         choice = input("Choice: ").strip().lower()
 

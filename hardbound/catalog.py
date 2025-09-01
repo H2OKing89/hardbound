@@ -7,8 +7,12 @@ import sqlite3
 from pathlib import Path
 from time import perf_counter
 from typing import Any, Dict, List, Optional
+from rich.console import Console
 
 from .display import Sty
+
+# Global console instance
+console = Console()
 
 # Database paths
 DB_DIR = Path.home() / ".cache" / "hardbound"
@@ -266,7 +270,7 @@ class AudiobookCatalog:
     def index_directory(self, root: Path, verbose: bool = False, progress_callback=None):
         """Index or update a directory tree"""
         if verbose:
-            print(f"{Sty.YELLOW}Indexing {root}...{Sty.RESET}")
+            console.print(f"[yellow]Indexing {root}...[/yellow]")
 
         count = 0
         # First pass: count total directories to process
@@ -333,7 +337,7 @@ class AudiobookCatalog:
         if progress_callback:
             progress_callback.done(f"Indexed {count} audiobooks")
         elif verbose:
-            print(f"{Sty.GREEN}✅ Indexed {count} audiobooks{Sty.RESET}")
+            console.print(f"[green]✅ Indexed {count} audiobooks[/green]")
 
         return count
 
@@ -382,7 +386,7 @@ class AudiobookCatalog:
     def rebuild_indexes(self, verbose: bool = False) -> Dict[str, Any]:
         """Rebuild all database indexes for optimal performance"""
         if verbose:
-            print(f"{Sty.YELLOW}Rebuilding database indexes...{Sty.RESET}")
+            console.print(f"[yellow]Rebuilding database indexes...[/yellow]")
 
         start_time = perf_counter()
 
@@ -407,14 +411,14 @@ class AudiobookCatalog:
 
         elapsed = perf_counter() - start_time
         if verbose:
-            print(f"{Sty.GREEN}✅ Indexes rebuilt in {elapsed:.2f}s{Sty.RESET}")
+            console.print(f"[green]✅ Indexes rebuilt in {elapsed:.2f}s[/green]")
 
         return {"elapsed": elapsed}
 
     def clean_orphaned_entries(self, verbose: bool = False) -> Dict[str, int]:
         """Remove entries for audiobooks that no longer exist on disk"""
         if verbose:
-            print(f"{Sty.YELLOW}Cleaning orphaned catalog entries...{Sty.RESET}")
+            console.print(f"[yellow]Cleaning orphaned catalog entries...[/yellow]")
 
         cursor = self.conn.execute("SELECT id, path FROM items")
         orphaned = []
@@ -425,7 +429,7 @@ class AudiobookCatalog:
 
         if not orphaned:
             if verbose:
-                print(f"{Sty.GREEN}✅ No orphaned entries found{Sty.RESET}")
+                console.print(f"[green]✅ No orphaned entries found[/green]")
             return {"removed": 0, "checked": len(list(cursor))}
 
         # Remove orphaned entries
@@ -434,14 +438,14 @@ class AudiobookCatalog:
         self.conn.commit()
 
         if verbose:
-            print(f"{Sty.GREEN}✅ Removed {len(orphaned)} orphaned entries{Sty.RESET}")
+            console.print(f"[green]✅ Removed {len(orphaned)} orphaned entries[/green]")
 
         return {"removed": len(orphaned), "checked": len(list(cursor))}
 
     def optimize_database(self, verbose: bool = False) -> Dict[str, Any]:
         """Run database optimization routines"""
         if verbose:
-            print(f"{Sty.YELLOW}Optimizing database...{Sty.RESET}")
+            console.print(f"[yellow]Optimizing database...[/yellow]")
 
         start_time = perf_counter()
 
@@ -465,7 +469,7 @@ class AudiobookCatalog:
         elapsed = perf_counter() - start_time
 
         if verbose:
-            print(f"{Sty.GREEN}✅ Database optimized in {elapsed:.2f}s{Sty.RESET}")
+            console.print(f"[green]✅ Database optimized in {elapsed:.2f}s[/green]")
 
         return {
             "elapsed": elapsed,
@@ -567,7 +571,7 @@ class AudiobookCatalog:
     def vacuum_database(self, verbose: bool = False) -> Dict[str, int]:
         """Reclaim unused database space"""
         if verbose:
-            print(f"{Sty.YELLOW}Vacuuming database...{Sty.RESET}")
+            console.print(f"[yellow]Vacuuming database...[/yellow]")
 
         start_size = DB_FILE.stat().st_size if DB_FILE.exists() else 0
 
@@ -577,8 +581,8 @@ class AudiobookCatalog:
         space_saved = start_size - end_size
 
         if verbose:
-            print(
-                f"{Sty.GREEN}✅ Reclaimed {space_saved / (1024*1024):.1f} MB{Sty.RESET}"
+            console.print(
+                f"[green]✅ Reclaimed {space_saved / (1024*1024):.1f} MB[/green]"
             )
 
         return {"space_saved": space_saved, "final_size": end_size}
@@ -586,7 +590,7 @@ class AudiobookCatalog:
     def verify_integrity(self, verbose: bool = False) -> Dict[str, Any]:
         """Verify database integrity and FTS5 consistency"""
         if verbose:
-            print(f"{Sty.YELLOW}Verifying database integrity...{Sty.RESET}")
+            console.print(f"[yellow]Verifying database integrity...[/yellow]")
 
         results = {}
 
@@ -634,9 +638,8 @@ class AudiobookCatalog:
                 if all(v is not False for v in results.values() if v is not None)
                 else "❌ ISSUES FOUND"
             )
-            print(
-                f"{Sty.GREEN if all(v is not False for v in results.values() if v is not None) else Sty.RED}{status}{Sty.RESET}"
-            )
+            color = "[green]" if all(v is not False for v in results.values() if v is not None) else "[red]"
+            console.print(f"{color}{status}[/{color}]")
 
         return results
 

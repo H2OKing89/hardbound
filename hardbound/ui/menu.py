@@ -5,7 +5,6 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich import box
-from ..display import Sty
 from .feedback import VisualFeedback
 
 
@@ -111,7 +110,6 @@ class MenuSystem:
 import re
 import unicodedata
 from typing import Dict, Callable, Optional
-from ..display import Sty
 
 
 def display_width(text: str) -> int:

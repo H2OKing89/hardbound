@@ -1,7 +1,10 @@
 """Input validation and path handling utilities"""
 from pathlib import Path
 from typing import Optional, List
-from ..display import Sty
+from rich.console import Console
+
+# Global console instance
+console = Console()
 
 
 class PathValidator:
@@ -16,13 +19,13 @@ class PathValidator:
         path = Path(path_str.strip()).expanduser()
 
         if not path.exists():
-            print(f"{Sty.YELLOW}⚠️  Path does not exist: {path}{Sty.RESET}")
-            print(f"{Sty.CYAN}💡 Tip: Check if the path is mounted or spelled correctly{Sty.RESET}")
+            console.print(f"[yellow]⚠️  Path does not exist: {path}[/yellow]")
+            console.print(f"[cyan]💡 Tip: Check if the path is mounted or spelled correctly[/cyan]")
             return None
 
         if not path.is_dir():
-            print(f"{Sty.YELLOW}⚠️  Not a directory: {path}{Sty.RESET}")
-            print(f"{Sty.CYAN}💡 Tip: Expected a folder, got a file{Sty.RESET}")
+            console.print(f"[yellow]⚠️  Not a directory: {path}[/yellow]")
+            console.print(f"[cyan]💡 Tip: Expected a folder, got a file[/cyan]")
             return None
 
         return path
@@ -37,8 +40,8 @@ class PathValidator:
 
         # Check if parent exists
         if not path.parent.exists():
-            print(f"{Sty.YELLOW}⚠️  Parent directory does not exist: {path.parent}{Sty.RESET}")
-            print(f"{Sty.CYAN}💡 Tip: Create the parent directory first{Sty.RESET}")
+            console.print(f"[yellow]⚠️  Parent directory does not exist: {path.parent}[/yellow]")
+            console.print(f"[cyan]💡 Tip: Create the parent directory first[/cyan]")
             return None
 
         return path
@@ -105,7 +108,7 @@ class InputValidator:
                     if valid.lower().startswith(choice.lower()):
                         return valid
 
-            print(f"{Sty.YELLOW}⚠️  Invalid choice. Valid options: {', '.join(valid_choices)}{Sty.RESET}")
+            console.print(f"[yellow]⚠️  Invalid choice. Valid options: {', '.join(valid_choices)}[/yellow]")
 
     @staticmethod
     def get_path(prompt: str, must_exist: bool = True) -> Optional[Path]:
@@ -127,9 +130,9 @@ class InputValidator:
             # Offer suggestions
             suggestions = PathValidator.suggest_similar_paths(path_str)
             if suggestions:
-                print(f"{Sty.CYAN}💡 Did you mean:{Sty.RESET}")
+                console.print(f"[cyan]💡 Did you mean:[/cyan]")
                 for i, suggestion in enumerate(suggestions, 1):
-                    print(f"   {i}. {suggestion}")
+                    console.print(f"   {i}. {suggestion}")
 
                 if InputValidator.get_choice("Use suggestion?", ["y", "n"]) == "y":
                     choice = InputValidator.get_choice("Which one?", [str(i) for i in range(1, len(suggestions) + 1)])
@@ -163,14 +166,14 @@ class InputValidator:
                 num = int(num_str)
 
                 if min_val is not None and num < min_val:
-                    print(f"{Sty.YELLOW}⚠️  Minimum value is {min_val}{Sty.RESET}")
+                    console.print(f"[yellow]⚠️  Minimum value is {min_val}[/yellow]")
                     continue
 
                 if max_val is not None and num > max_val:
-                    print(f"{Sty.YELLOW}⚠️  Maximum value is {max_val}{Sty.RESET}")
+                    console.print(f"[yellow]⚠️  Maximum value is {max_val}[/yellow]")
                     continue
 
                 return num
 
             except ValueError:
-                print(f"{Sty.YELLOW}⚠️  Please enter a valid number{Sty.RESET}")
+                console.print(f"[yellow]⚠️  Please enter a valid number[/yellow]")

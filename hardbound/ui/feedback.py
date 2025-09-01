@@ -55,28 +55,6 @@ class VisualFeedback:
         )
         self.console.print(panel)
 
-    @staticmethod
-    def progress_bar(current: int, total: int, message: str = "", width: int = 40):
-        """Display progress bar"""
-        if total == 0:
-            return
-
-        percent = (current / total) * 100
-        filled = int(width * current / total)
-        bar = "█" * filled + "░" * (width - filled)
-
-        print(f"\r{Sty.CYAN}⏳{Sty.RESET} [{bar}] {percent:.1f}% {message}", end="", flush=True)
-
-        if current >= total:
-            print()  # New line when complete
-
-    @staticmethod
-    def spinner(frame: int, message: str):
-        """Display spinning indicator"""
-        spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-        char = spinner_chars[frame % len(spinner_chars)]
-        print(f"\r{Sty.CYAN}{char}{Sty.RESET} {message}", end="", flush=True)
-
 
 class ProgressIndicator:
     """Visual progress feedback for long operations with Rich"""
