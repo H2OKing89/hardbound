@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hardbound"
+version = "2.0.0"
+description = "Scalable audiobook hardlink manager"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "Topic :: System :: Filesystems",
+]
+dependencies = [
+    "tqdm>=4.64.0; extra == 'progress'",
+]
+
+[project.optional-dependencies]
+progress = ["tqdm>=4.64.0"]
+testing = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+    "pytest-xdist>=3.0.0",
+]
+all = ["tqdm>=4.64.0", "pytest>=7.0.0", "pytest-cov>=4.0.0", "pytest-mock>=3.10.0", "pytest-xdist>=3.0.0"]
+
+[project.scripts]
+hardbound = "hardbound:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/hardbound"
+Repository = "https://github.com/yourusername/hardbound.git"
+Issues = "https://github.com/yourusername/hardbound/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--tb=short",
+    "--strict-markers",
+    "--disable-warnings",
+    "--cov=hardbound",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+    "--cov-fail-under=80"
+]
+
+[tool.coverage.run]
+source = ["hardbound"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+]
+
+[tool.isort]
+profile = "black"

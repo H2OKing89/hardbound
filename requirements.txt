@@ -1,0 +1,18 @@
+# Core dependencies (all standard library except optional ones)
+# sqlite3 - included with Python
+# pathlib - included with Python 3.4+
+# argparse - included with Python
+# json - included with Python
+# os - included with Python
+# sys - included with Python
+# shutil - included with Python
+# subprocess - included with Python
+# time - included with Python
+# datetime - included with Python
+# typing - included with Python 3.5+
+# hashlib - included with Python
+# threading - included with Python
+
+# Optional dependencies
+tqdm>=4.64.0  # Progress bars (optional)
+# fzf is external tool, not Python package
