@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hardbound"
+version = "1.0.0"
+description = "Scalable audiobook hardlink manager"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.6"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: Python :: 3.11",
+    "Topic :: Multimedia :: Sound/Audio :: Analysis",
+    "Topic :: System :: Filesystems",
+]
+dependencies = [
+    "tqdm>=4.64.0; extra == 'progress'",
+]
+
+[project.optional-dependencies]
+progress = ["tqdm>=4.64.0"]
+all = ["tqdm>=4.64.0"]
+
+[project.scripts]
+hardbound = "hardbound:main"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/hardbound"
+Repository = "https://github.com/yourusername/hardbound.git"
+Issues = "https://github.com/yourusername/hardbound/issues"
+
+[tool.setuptools]
+packages = []
+
+[tool.setuptools.package-dir]
+"" = "."
+
+[tool.setuptools.package-data]
+hardbound = ["*.txt", "*.md"]
