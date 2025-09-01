@@ -263,12 +263,25 @@ class AudiobookCatalog:
 
         return "Unknown"
 
-    def index_directory(self, root: Path, verbose: bool = False):
+    def index_directory(self, root: Path, verbose: bool = False, progress_callback=None):
         """Index or update a directory tree"""
         if verbose:
             print(f"{Sty.YELLOW}Indexing {root}...{Sty.RESET}")
 
         count = 0
+        # First pass: count total directories to process
+        total_dirs = 0
+        for path in root.rglob("*"):
+            if path.is_dir():
+                m4b_files = list(path.glob("*.m4b"))
+                mp3_files = list(path.glob("*.mp3"))
+                if m4b_files or mp3_files:
+                    total_dirs += 1
+
+        if progress_callback and total_dirs > 0:
+            progress_callback.start()
+            progress_callback.total = total_dirs
+
         for path in root.rglob("*"):
             if not path.is_dir():
                 continue
@@ -310,12 +323,16 @@ class AudiobookCatalog:
             )
 
             count += 1
-            if verbose and count % 100 == 0:
+            if progress_callback:
+                progress_callback.update(f"Indexed {count}/{total_dirs} audiobooks")
+            elif verbose and count % 100 == 0:
                 print(f"  Indexed {count} audiobooks...")
 
         self.conn.commit()
 
-        if verbose:
+        if progress_callback:
+            progress_callback.done(f"Indexed {count} audiobooks")
+        elif verbose:
             print(f"{Sty.GREEN}✅ Indexed {count} audiobooks{Sty.RESET}")
 
         return count

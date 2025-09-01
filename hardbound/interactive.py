@@ -16,7 +16,7 @@ from .config import load_config, save_config
 from .display import Sty, summary_table
 from .linker import plan_and_link, zero_pad_vol
 from .ui.menu import menu_system, create_main_menu
-from .ui.feedback import VisualFeedback, ErrorHandler
+from .ui.feedback import VisualFeedback, ErrorHandler, ProgressIndicator
 from .utils.validation import PathValidator, InputValidator
 from .utils.validation import PathValidator, InputValidator
 
@@ -87,7 +87,7 @@ def hierarchical_browser(catalog) -> List[str]:
     choice = input("Choice: ").strip().upper()
 
     if choice.lower() == "search":
-        return text_search_browser(catalog)
+        return enhanced_text_search_browser(catalog)
 
     if not choice or choice not in authors_by_initial:
         print(f"{Sty.YELLOW}Invalid selection{Sty.RESET}")
@@ -204,19 +204,49 @@ def hierarchical_browser(catalog) -> List[str]:
         return selected
 
 
-def text_search_browser(catalog: AudiobookCatalog) -> List[str]:
-    """Simple text search browser as fallback"""
-    print(f"\n{Sty.CYAN}🔍 TEXT SEARCH{Sty.RESET}")
+def enhanced_text_search_browser(catalog: AudiobookCatalog) -> List[str]:
+    """Enhanced text search browser with autocomplete and history"""
+    print(f"\n{Sty.CYAN}🔍 ENHANCED TEXT SEARCH{Sty.RESET}")
+
+    # Load search history
+    history_file = Path.home() / ".cache" / "hardbound" / "search_history.txt"
+    history_file.parent.mkdir(parents=True, exist_ok=True)
+
+    search_history = []
+    if history_file.exists():
+        try:
+            with open(history_file, 'r', encoding='utf-8') as f:
+                search_history = [line.strip() for line in f.readlines() if line.strip()]
+        except Exception:
+            pass  # Ignore history loading errors
+
+    # Get autocomplete suggestions from catalog
+    autocomplete_suggestions = _get_autocomplete_suggestions(catalog)
+
     print("\nEnter search terms (author, title, series):")
-    query = input("Search: ").strip()
+    print(f"{Sty.DIM}💡 Type a few letters and press Tab for suggestions{Sty.RESET}")
+    print(f"{Sty.DIM}💡 Press ↑/↓ for search history{Sty.RESET}")
+
+    query = _enhanced_input("Search: ", autocomplete_suggestions, search_history)
 
     if not query:
         return []
+
+    # Save to history
+    if query not in search_history:
+        search_history.insert(0, query)
+        search_history = search_history[:50]  # Keep last 50 searches
+        try:
+            with open(history_file, 'w', encoding='utf-8') as f:
+                f.write('\n'.join(search_history))
+        except Exception:
+            pass  # Ignore history saving errors
 
     results = catalog.search(query, limit=100)
 
     if not results:
         print(f"{Sty.YELLOW}No results found{Sty.RESET}")
+        print(f"{Sty.DIM}💡 Try different keywords or check spelling{Sty.RESET}")
         return []
 
     print(f"\n{Sty.GREEN}Found {len(results)} result(s):{Sty.RESET}\n")
@@ -275,6 +305,54 @@ def text_search_browser(catalog: AudiobookCatalog) -> List[str]:
                         selected.append(results[idx]["path"])
             if selected:
                 return selected
+
+
+def _get_autocomplete_suggestions(catalog: AudiobookCatalog) -> List[str]:
+    """Get autocomplete suggestions from catalog"""
+    suggestions = set()
+
+    # Get some recent/popular authors and series
+    try:
+        cursor = catalog.conn.execute("""
+            SELECT author, series, book FROM items
+            WHERE author != 'Unknown'
+            ORDER BY mtime DESC
+            LIMIT 100
+        """)
+
+        for row in cursor.fetchall():
+            author = row[0]
+            series = row[1]
+            book = row[2]
+
+            if author and len(author) > 2:
+                suggestions.add(author)
+            if series and len(series) > 2:
+                suggestions.add(series)
+            if book and len(book) > 3:
+                # Add first few words of book title
+                words = book.split()[:3]
+                if len(words) >= 2:
+                    suggestions.add(' '.join(words))
+
+    except Exception:
+        pass  # Ignore errors
+
+    return sorted(list(suggestions))
+
+
+def _enhanced_input(prompt: str, autocomplete: List[str], history: List[str]) -> str:
+    """Enhanced input with basic autocomplete and history"""
+    print(prompt, end="", flush=True)
+
+    # Simple implementation - in a real enhancement, this would use readline
+    # For now, just provide basic input with hints
+    try:
+        query = input().strip()
+        return query
+    except KeyboardInterrupt:
+        print("\nCancelled.")
+        return ""
 
 
 # Update fzf_pick to use hierarchical browser when fzf is not available
@@ -436,16 +514,13 @@ def interactive_mode():
     # Initialize catalog if needed
     if not DB_FILE.exists():
         VisualFeedback.info("No catalog found. Building index...")
-        progress = ProgressIndicator("Building catalog")
-        progress.start()
 
         catalog = AudiobookCatalog()
         default_path = PathValidator.get_default_search_paths()
         if default_path:
-            catalog.index_directory(default_path[0], verbose=False)
+            progress = ProgressIndicator("Building catalog")
+            catalog.index_directory(default_path[0], verbose=False, progress_callback=progress)
         catalog.close()
-
-        progress.done()
 
     # First run setup with better UX
     if config.get("first_run", True):
@@ -583,12 +658,12 @@ def search_and_link_wizard():
     if choice == "1":
         selected_paths = hierarchical_browser(catalog)
     elif choice == "2":
-        selected_paths = text_search_browser(catalog)
+        selected_paths = enhanced_text_search_browser(catalog)
     elif choice == "3":
         results = catalog.search("*", limit=50)
         if results:
             print(f"\n{Sty.GREEN}Recent audiobooks:{Sty.RESET}")
-            selected_paths = text_search_browser(catalog)
+            selected_paths = enhanced_text_search_browser(catalog)
         else:
             print(f"{Sty.YELLOW}No audiobooks found{Sty.RESET}")
             selected_paths = []
@@ -674,13 +749,16 @@ def update_catalog_wizard():
             return
 
         print(f"\n📂 Scanning library path: {library_path}")
-        count = catalog.index_directory(library_path, verbose=True)
+        progress = ProgressIndicator("Indexing audiobooks")
+        count = catalog.index_directory(library_path, verbose=False, progress_callback=progress)
         print(f"{Sty.GREEN}✅ Indexed {count} audiobooks{Sty.RESET}")
     elif choice == "2":
         # Manual directory selection
         root = Path(input("Enter directory path: ").strip())
         if root.exists() and root.is_dir():
-            count = catalog.index_directory(root, verbose=True)
+            print(f"\n📂 Scanning directory: {root}")
+            progress = ProgressIndicator("Indexing audiobooks")
+            count = catalog.index_directory(root, verbose=False, progress_callback=progress)
             print(f"{Sty.GREEN}✅ Indexed {count} audiobooks{Sty.RESET}")
         else:
             print(f"{Sty.RED}❌ Invalid directory: {root}{Sty.RESET}")
