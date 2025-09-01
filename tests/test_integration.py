@@ -158,13 +158,14 @@ class TestConfigIntegration:
                 assert config["library_path"] == ""
 
                 # Test saving config
-                config["library_path"] = "/test/path"
+                config["library_path"] = str(temp_path)  # Use the temp directory which exists
+                config["torrent_path"] = str(temp_path)  # Set torrent path too
                 config["first_run"] = False
                 save_config(config)
 
                 # Test loading saved config
                 loaded_config = load_config()
-                assert loaded_config["library_path"] == "/test/path"
+                assert loaded_config["library_path"] == str(temp_path)
                 assert loaded_config["first_run"] is False
 
 

@@ -90,8 +90,8 @@ class MenuSystem:
             except EOFError:
                 return None
 
-    def handle_choice(self, menu_name: str, choice: str) -> bool:
-        """Handle menu choice and return True if should continue"""
+    def handle_choice(self, menu_name: str, choice: str):
+        """Handle menu choice and return result (bool for continue, str for menu switch)"""
         if menu_name not in self.menus:
             return True
 
@@ -101,7 +101,7 @@ class MenuSystem:
             if handler:
                 try:
                     result = handler()
-                    return result if result is not None else True
+                    return result  # Could be bool, str (menu name), or None
                 except Exception as e:
                     self.console.print(f"[red]❌ Error: {e}[/red]")
                     return True
@@ -175,6 +175,10 @@ def create_main_menu():
         feedback.info("Goodbye!")
         return False
 
+    def quick_actions_handler():
+        """Switch to quick actions menu"""
+        return "quick"
+
     menu_system.add_menu(
         'main',
         'HARDBOUND - Audiobook Manager',
@@ -185,6 +189,7 @@ def create_main_menu():
             '4': ('📁 Browse by Folder', browse_handler),
             '5': ('⚙️  Settings & Preferences', settings_handler),
             '6': ('❓ Help & Tutorial', help_handler),
+            'Q': ('⚡ Quick Actions', quick_actions_handler),
             '7': ('🚪 Exit', exit_handler)
         },
         width=45
@@ -193,15 +198,44 @@ def create_main_menu():
 
 def create_quick_actions_menu():
     """Create streamlined quick actions menu"""
+
+    def quick_search_handler():
+        """Quick search and link"""
+        from ..interactive import search_and_link_wizard
+        search_and_link_wizard()
+        return True
+
+    def quick_recent_handler():
+        """Quick process recent downloads"""
+        from ..interactive import recent_downloads_scanner
+        recent_downloads_scanner()
+        return True
+
+    def quick_browse_handler():
+        """Quick browse library"""
+        from ..interactive import folder_batch_wizard
+        folder_batch_wizard()
+        return True
+
+    def more_options_handler():
+        """Switch to full menu"""
+        return "main"  # Return menu name to switch to
+
+    def quick_exit_handler():
+        """Quick exit"""
+        feedback = VisualFeedback()
+        feedback.info("Goodbye!")
+        return False
+
     menu_system.add_menu(
         'quick',
         'Quick Actions',
         {
-            '1': ('🔍 Search & Link', None),
-            '2': ('📥 Process Recent', None),
-            '3': ('📚 Browse Library', None),
-            '4': ('⚙️  More Options...', None),
-            '0': ('🚪 Exit', None)
+            '1': ('🔍 Search & Link', quick_search_handler),
+            '2': ('📥 Process Recent', quick_recent_handler),
+            '3': ('📚 Browse Library', quick_browse_handler),
+            '4': ('⚙️  More Options...', more_options_handler),
+            '0': ('🚪 Exit', quick_exit_handler)
         },
         width=35
     )

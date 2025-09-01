@@ -19,21 +19,24 @@ class TestConfig:
         """Test loading default config when no file exists"""
         with patch("pathlib.Path.exists", return_value=False):
             config = load_config()
-            expected = {
-                "first_run": True,
-                "library_path": "",
-                "torrent_path": "",
-                "zero_pad": True,
-                "also_cover": False,
-                "recent_sources": [],
-            }
-            assert config == expected
+            # Check that we have the expected keys (not the full dict since it has more defaults now)
+            assert config["first_run"] is True
+            assert config["library_path"] == ""
+            assert config["torrent_path"] == ""
+            assert config["zero_pad"] is True
+            assert config["also_cover"] is False
+            assert isinstance(config["recent_sources"], list)
+            # New config keys
+            assert "auto_update_catalog" in config
+            assert "parallel_processing" in config
+            assert "system_search_paths" in config
 
     def test_load_config_from_file(self):
         """Test loading config from existing file"""
         test_config = {
             "first_run": False,
-            "library_path": "/test/path",
+            "library_path": "/tmp",  # Use a valid path for testing
+            "torrent_path": "/tmp",
             "zero_pad": False,
             "also_cover": True,
             "recent_sources": ["/path1", "/path2"],
@@ -43,7 +46,11 @@ class TestConfig:
             "pathlib.Path.read_text", return_value=json.dumps(test_config)
         ):
             config = load_config()
-            assert config == test_config
+            assert config["first_run"] is False
+            assert config["library_path"] == "/tmp"
+            assert config["zero_pad"] is False
+            assert config["also_cover"] is True
+            assert config["recent_sources"] == ["/path1", "/path2"]
 
     def test_load_config_invalid_json(self):
         """Test loading config with invalid JSON falls back to defaults"""

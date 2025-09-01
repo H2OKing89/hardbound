@@ -15,7 +15,7 @@ from .catalog import DB_FILE, AudiobookCatalog
 from .config import load_config, save_config
 from .display import Sty, summary_table
 from .linker import plan_and_link, zero_pad_vol
-from .ui.menu import menu_system, create_main_menu
+from .ui.menu import menu_system, create_main_menu, create_quick_actions_menu
 from .ui.feedback import VisualFeedback, ErrorHandler, ProgressIndicator
 from .utils.validation import PathValidator, InputValidator
 from rich.console import Console
@@ -555,14 +555,25 @@ def interactive_mode():
 
     # Create main menu
     create_main_menu()
+    create_quick_actions_menu()
 
     # Main interaction loop
+    current_menu = 'main'
     running = True
     while running:
         try:
-            choice = menu_system.display_menu('main')
+            choice = menu_system.display_menu(current_menu)
             if choice:
-                running = menu_system.handle_choice('main', choice)
+                result = menu_system.handle_choice(current_menu, choice)
+                if isinstance(result, str):
+                    # Menu switch requested
+                    if result in ['main', 'quick']:
+                        current_menu = result
+                    else:
+                        running = False if result == 'exit' else True
+                else:
+                    # Boolean result
+                    running = result if result is not None else True
             else:
                 running = False
 
@@ -997,7 +1008,10 @@ This saves space while letting you seed without duplicating files.
     input()
 
 
-def find_recent_audiobooks(hours=24, max_depth=3):
+def find_recent_audiobooks(hours=24, max_depth=3, config=None):
+    """Find recently modified audiobook files"""
+    if config is None:
+        config = load_config()
     """Find recently modified audiobook folders with better depth control"""
     recent = []
     seen = set()
@@ -1009,11 +1023,16 @@ def find_recent_audiobooks(hours=24, max_depth=3):
         Path.home() / "Documents" / "audiobooks",
     ]
 
-    # Add system-specific paths if they exist
-    system_paths = [
-        Path("/mnt/user/data/audio/audiobooks"),
-        Path("/mnt/user/data/downloads"),
-    ]
+    # Add system-specific paths from config if they exist
+    system_paths_config = config.get("system_search_paths")
+    if system_paths_config and isinstance(system_paths_config, list):
+        system_paths = [Path(p) for p in system_paths_config]
+    else:
+        # Default system paths
+        system_paths = [
+            Path("/mnt/user/data/audio/audiobooks"),
+            Path("/mnt/user/data/downloads"),
+        ]
 
     for sys_path in system_paths:
         if sys_path.exists():
