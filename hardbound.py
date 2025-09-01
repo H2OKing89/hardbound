@@ -1443,17 +1443,28 @@ def normalize_weird_ext(src_name: str) -> str:
             return src_name[: -len(bad)] + good
     return src_name
 
+def clean_base_name(name: str) -> str:
+    """Remove user tags from base name for cleaner destination names"""
+    # Remove common user tags like [H2OKing], [UserName], etc.
+    # Pattern: [anything] at the end of the name
+    import re
+    cleaned = re.sub(r'\s*\[[^\]]+\]\s*$', '', name)
+    return cleaned.strip()
+
 def choose_base_outputs(dest_dir: Path, base_name: str):
     """Return canonical dest paths for common types."""
+    # Remove user tags from file names while keeping them in folder names
+    clean_file_base = clean_base_name(base_name)
+    
     return {
-        "cue": dest_dir / f"{base_name}.cue",
-        "jpg": dest_dir / f"{base_name}.jpg",
-        "m4b": dest_dir / f"{base_name}.m4b",
-        "mp3": dest_dir / f"{base_name}.mp3",
-        "flac": dest_dir / f"{base_name}.flac",
-        "pdf": dest_dir / f"{base_name}.pdf",
-        "txt": dest_dir / f"{base_name}.txt",
-        "nfo": dest_dir / f"{base_name}.nfo",
+        "cue": dest_dir / f"{clean_file_base}.cue",
+        "jpg": dest_dir / f"{clean_file_base}.jpg",
+        "m4b": dest_dir / f"{clean_file_base}.m4b",
+        "mp3": dest_dir / f"{clean_file_base}.mp3",
+        "flac": dest_dir / f"{clean_file_base}.flac",
+        "pdf": dest_dir / f"{clean_file_base}.pdf",
+        "txt": dest_dir / f"{clean_file_base}.txt",
+        "nfo": dest_dir / f"{clean_file_base}.nfo",
     }
 
 def dest_is_excluded(p: Path) -> bool:
