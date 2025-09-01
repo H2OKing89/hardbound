@@ -267,6 +267,9 @@ python -m pytest tests/test_config.py -v
 
 # Run tests in parallel (requires pytest-xdist)
 python -m pytest tests/ -n auto
+
+# Run with coverage and HTML report
+pytest --cov=hardbound --cov-report=html
 ```
 
 #### Test Structure
@@ -290,13 +293,31 @@ The test suite aims for high code coverage. Current coverage report:
 - Core utilities: ~90% coverage
 - Main business logic: ~10-20% coverage (room for improvement)
 
+### Code Quality
+
+Hardbound maintains high code quality standards:
+
+- **Static Analysis**: Uses Pylance for comprehensive type checking
+- **Linting**: Automated code quality checks in CI/CD pipeline
+- **Type Safety**: Full type annotations throughout the codebase
+- **Documentation**: Inline documentation and comprehensive README
+
+### CI/CD Pipeline
+
+Automated testing and quality checks via GitHub Actions:
+- **Multi-Python Support**: Tests on Python 3.8 through 3.13
+- **Coverage Reporting**: Automated coverage analysis with Codecov
+- **Quality Gates**: Static analysis and linting checks
+- **Automated Releases**: Streamlined deployment process
+
 ### Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Write tests for new functionality
 4. Ensure all tests pass
-5. Submit a pull request
+5. Run static analysis: `python -m mypy hardbound/` (if mypy configured)
+6. Submit a pull request
 
 ## License
 
