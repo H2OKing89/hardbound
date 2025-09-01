@@ -14,8 +14,8 @@ class TestSty:
     def test_sty_colors_enabled(self):
         """Test that colors are enabled by default"""
         assert Sty.enabled is True
-        assert Sty.RED == "\x1b[31m"
-        assert Sty.RESET == "\x1b[0m"
+        assert Sty.RED == "red"
+        assert Sty.RESET == ""
 
     def test_sty_off(self):
         """Test disabling colors"""
@@ -26,7 +26,7 @@ class TestSty:
         try:
             Sty.off()
             assert Sty.enabled is False
-            assert Sty.RED == ""  # Should be cleared
+            assert Sty.RED == "red"  # Colors remain the same, just disabled flag
             assert Sty.RESET == ""
         finally:
             # Restore original state
@@ -83,7 +83,7 @@ class TestBanner:
     """Test banner display function"""
 
     @patch("hardbound.display.term_width")
-    @patch("builtins.print")
+    @patch("hardbound.display.console.print")
     def test_banner_dry_run(self, mock_print, mock_width):
         """Test banner display for dry run mode"""
         mock_width.return_value = 50
@@ -93,7 +93,7 @@ class TestBanner:
         assert mock_print.called
 
     @patch("hardbound.display.term_width")
-    @patch("builtins.print")
+    @patch("hardbound.display.console.print")
     def test_banner_commit(self, mock_print, mock_width):
         """Test banner display for commit mode"""
         mock_width.return_value = 50
@@ -105,7 +105,7 @@ class TestBanner:
 class TestSection:
     """Test section display function"""
 
-    @patch("builtins.print")
+    @patch("hardbound.display.console.print")
     def test_section_display(self, mock_print):
         """Test section header display"""
         section("Test Section")
@@ -119,7 +119,7 @@ class TestSection:
 class TestSummaryTable:
     """Test summary table display"""
 
-    @patch("builtins.print")
+    @patch("hardbound.display.console.print")
     def test_summary_table_display(self, mock_print):
         """Test summary table display"""
         stats = {

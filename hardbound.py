@@ -7,6 +7,7 @@ import argparse
 import sys
 from pathlib import Path
 from time import perf_counter
+from rich.console import Console
 
 # Import from package
 from hardbound.display import Sty, banner, section, summary_table
@@ -15,21 +16,24 @@ from hardbound.interactive import interactive_mode
 from hardbound.linker import plan_and_link, preflight_checks, zero_pad_vol, run_batch
 from hardbound.config import load_config
 
+# Global console instance
+console = Console()
+
 def _classic_cli_mode(args):
     """Handle classic CLI arguments for backward compatibility"""
     # Mutually-aware run mode
     if args.commit and args.dry_run:
-        print(f"{Sty.RED}[ERR] Use either --commit or --dry-run, not both.{Sty.RESET}", file=sys.stderr)
+        print(f"\x1b[31m[ERR] Use either --commit or --dry-run, not both.\x1b[0m", file=sys.stderr)
         sys.exit(2)
     dry = args.dry_run or (not args.commit)
 
     # Handle batch file mode
     if args.batch_file:
         if any([args.src, args.dst, args.base_name]):
-            print(f"{Sty.RED}[ERR] Use --batch-file OR single --src/--dst, not both.{Sty.RESET}", file=sys.stderr)
+            print(f"\x1b[31m[ERR] Use --batch-file OR single --src/--dst, not both.\x1b[0m", file=sys.stderr)
             sys.exit(2)
         if not args.batch_file.exists():
-            print(f"{Sty.RED}[ERR] Batch file not found: {args.batch_file}{Sty.RESET}", file=sys.stderr)
+            print(f"\x1b[31m[ERR] Batch file not found: {args.batch_file}\x1b[0m", file=sys.stderr)
             sys.exit(2)
         
         start = perf_counter()
@@ -40,16 +44,16 @@ def _classic_cli_mode(args):
 
     # Single run mode
     if not args.src or (not args.dst and not args.dst_root):
-        print(f"{Sty.YELLOW}[HINT]{Sty.RESET} Provide --src and either --dst or --dst-root (or use --batch-file).")
+        console.print(f"[yellow][HINT][/yellow] Provide --src and either --dst or --dst-root (or use --batch-file).")
         sys.exit(2)
 
     if not args.src.exists():
-        print(f"{Sty.RED}[ERR] Source not found: {args.src}{Sty.RESET}", file=sys.stderr)
+        print(f"\x1b[31m[ERR] Source not found: {args.src}\x1b[0m", file=sys.stderr)
         sys.exit(2)
 
     # Sanity check: don't allow both --dst and --dst-root
     if args.dst and args.dst_root:
-        print(f"{Sty.RED}[ERR] Use either --dst or --dst-root, not both.{Sty.RESET}", file=sys.stderr)
+        print(f"\x1b[31m[ERR] Use either --dst or --dst-root, not both.\x1b[0m", file=sys.stderr)
         sys.exit(2)
 
     # If using dst-root, compute the real destination folder and base name
@@ -68,11 +72,11 @@ def _classic_cli_mode(args):
     banner("Audiobook Hardlinker", "dry" if dry else "commit")
     
     section("Plan")
-    print(f"{Sty.BOLD} SRC{Sty.RESET}: {args.src}")
-    print(f"{Sty.BOLD} DST{Sty.RESET}: {dst_dir}")
-    print(f"{Sty.BOLD} BASE{Sty.RESET}: {base}")
-    print(f"{Sty.BOLD} MODE{Sty.RESET}: {'DRY-RUN' if dry else 'COMMIT'}")
-    print(f"{Sty.BOLD} OPTS{Sty.RESET}: zero_pad_vol={args.zero_pad_vol}  also_cover={args.also_cover}  force={args.force}")
+    console.print(f"[bold] SRC[/bold]: {args.src}")
+    console.print(f"[bold] DST[/bold]: {dst_dir}")
+    console.print(f"[bold] BASE[/bold]: {base}")
+    console.print(f"[bold] MODE[/bold]: {'DRY-RUN' if dry else 'COMMIT'}")
+    console.print(f"[bold] OPTS[/bold]: zero_pad_vol={args.zero_pad_vol}  also_cover={args.also_cover}  force={args.force}")
     print()
 
     stats = {"linked":0, "replaced":0, "already":0, "exists":0, "excluded":0, "skipped":0, "errors":0}

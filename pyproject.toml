@@ -25,6 +25,7 @@ classifiers = [
     "Topic :: System :: Filesystems",
 ]
 dependencies = [
+    "rich>=13.0.0",
     "tqdm>=4.64.0; extra == 'progress'",
 ]
 
@@ -48,6 +49,11 @@ Issues = "https://github.com/yourusername/hardbound/issues"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests"
+]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

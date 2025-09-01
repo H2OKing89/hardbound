@@ -13,6 +13,9 @@
 # hashlib - included with Python
 # threading - included with Python
 
+# Required dependencies
+rich>=13.0.0  # Beautiful CLI interfaces with proper Unicode support
+
 # Optional dependencies
 tqdm>=4.64.0  # Progress bars (optional)
 # fzf is external tool, not Python package

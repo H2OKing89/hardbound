@@ -1,36 +1,41 @@
 """
-Display utilities and formatting
+Display utilities and formatting using Rich
 """
 
 import re
 import shutil
 from pathlib import Path
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+
+# Global console instance
+console = Console()
+
 
 class Sty:
-    """ANSI color codes for terminal output"""
+    """Rich color/style compatibility layer"""
 
-    RESET = "\x1b[0m"
-    BOLD = "\x1b[1m"
-    DIM = "\x1b[2m"
-    ITAL = "\x1b[3m"
-    GREY = "\x1b[90m"
-    RED = "\x1b[31m"
-    GREEN = "\x1b[32m"
-    YELLOW = "\x1b[33m"
-    BLUE = "\x1b[34m"
-    MAGENTA = "\x1b[35m"
-    CYAN = "\x1b[36m"
-    WHITE = "\x1b[37m"
+    RESET = ""
+    BOLD = "bold"
+    DIM = "dim"
+    ITAL = "italic"
+    GREY = "gray"
+    RED = "red"
+    GREEN = "green"
+    YELLOW = "yellow"
+    BLUE = "blue"
+    MAGENTA = "magenta"
+    CYAN = "cyan"
+    WHITE = "white"
 
     enabled = True
 
     @classmethod
     def off(cls):
         cls.enabled = False
-        for k, v in cls.__dict__.items():
-            if isinstance(v, str) and v.startswith("\x1b"):
-                setattr(cls, k, "")
 
 
 def term_width(default=100):
@@ -50,60 +55,68 @@ def ellipsize(s: str, limit: int) -> str:
 
 
 def banner(title: str, mode: str):
-    w = term_width()
-    line = "─" * max(4, w - 2)
-    label = f"{Sty.BOLD}{Sty.CYAN} {title} {Sty.RESET}"
+    """Display a banner with title and mode using Rich Panel"""
     mode_tag = (
-        f"{Sty.YELLOW}[DRY-RUN]{Sty.RESET}"
-        if mode == "dry"
-        else f"{Sty.GREEN}[COMMIT]{Sty.RESET}"
+        "[yellow][DRY-RUN][/yellow]" if mode == "dry" else "[green][COMMIT][/green]"
     )
-    print(f"┌{line}┐")
-    print(f"│ {label}{mode_tag}".ljust(w - 1) + "│")
-    print(f"└{line}┘")
+
+    panel = Panel.fit(
+        f"[bold cyan] {title} [/bold cyan]{mode_tag}", border_style="cyan"
+    )
+    console.print(panel)
 
 
 def section(title: str):
-    w = term_width()
-    line = "─" * max(4, w - 2)
-    print(f"{Sty.MAGENTA}{title}{Sty.RESET}")
-    print(line)
+    """Display a section header using Rich"""
+    console.print(f"\n[magenta]{title}[/magenta]")
+    console.print("─" * term_width())
 
 
 def row(
     status_icon: str, status_color: str, kind: str, src: Path, dst: Path, dry: bool
 ):
-    w = term_width()
-    left = f"{status_icon} {status_color}{kind:<6}{Sty.RESET}"
-    middle = f"{Sty.GREY}{src}{Sty.RESET} {Sty.DIM}→{Sty.RESET} {dst}"
-    usable = max(20, w - len(strip_ansi(left)) - 6)
-    print(f"{left}  {ellipsize(middle, usable)}")
+    """Display a row with status using Rich"""
+    # Convert ANSI color to Rich markup
+    color_map = {
+        Sty.GREEN: "green",
+        Sty.BLUE: "blue",
+        Sty.YELLOW: "yellow",
+        Sty.RED: "red",
+        Sty.GREY: "gray",
+        Sty.CYAN: "cyan",
+        Sty.MAGENTA: "magenta",
+    }
+
+    # Handle both old Sty constants and direct color strings
+    if status_color in color_map:
+        rich_color = color_map[status_color]
+    else:
+        rich_color = status_color
+
+    left = f"{status_icon} [{rich_color}]{kind:<6}[/{rich_color}]"
+    middle = f"[grey]{src}[/grey] [dim]→[/dim] {dst}"
+
+    console.print(f"{left}  {ellipsize(middle, term_width() - 20)}")
 
 
 def strip_ansi(s: str) -> str:
-    import re
-
+    """Strip ANSI codes from string"""
     return re.sub(r"\x1b\[[0-9;]*m", "", s)
 
 
 def summary_table(stats: dict, elapsed: float):
-    w = term_width()
-    line = "─" * max(4, w - 2)
-    print(line)
+    """Display summary statistics using Rich Table"""
+    table = Table(show_header=False, box=None)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Count", justify="right")
 
-    def cell(label, n, color):
-        return f"{color}{label}:{Sty.RESET} {n}"
+    table.add_row("linked", str(stats["linked"]), style="green")
+    table.add_row("replaced", str(stats["replaced"]), style="blue")
+    table.add_row("already", str(stats["already"]), style="gray")
+    table.add_row("exists", str(stats["exists"]), style="yellow")
+    table.add_row("excluded", str(stats["excluded"]), style="gray")
+    table.add_row("skipped", str(stats["skipped"]), style="gray")
+    table.add_row("errors", str(stats["errors"]), style="red")
 
-    cells = [
-        cell("linked", stats["linked"], Sty.GREEN),
-        cell("replaced", stats["replaced"], Sty.BLUE),
-        cell("already", stats["already"], Sty.GREY),
-        cell("exists", stats["exists"], Sty.YELLOW),
-        cell("excluded", stats["excluded"], Sty.GREY),
-        cell("skipped", stats["skipped"], Sty.GREY),
-        cell("errors", stats["errors"], Sty.RED),
-    ]
-    s = "  |  ".join(cells)
-    print(s)
-    print(f"{Sty.CYAN}elapsed{Sty.RESET}: {elapsed:.3f}s")
-    print(line)
+    console.print(table)
+    console.print(f"[cyan]elapsed[/cyan]: {elapsed:.3f}s")
