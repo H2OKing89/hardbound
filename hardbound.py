@@ -99,32 +99,153 @@ class AudiobookCatalog:
     def parse_audiobook_path(self, path: Path) -> Dict[str, str]:
         """Extract author/series/book from path structure"""
         parts = path.parts
-        result = {"author": "", "series": "", "book": path.name, "asin": ""}
+        result = {"author": "Unknown", "series": "", "book": path.name, "asin": ""}
         
-        # Common patterns:
-        # /audiobooks/Author/Series/Book
-        # /audiobooks/Author/Book
-        # /downloads/Book
+        # Extract ASIN from book name if present
+        asin_patterns = [
+            r'\{ASIN\.([A-Z0-9]{10})\}',  # {ASIN.B0C34GQRYZ}
+            r'\[ASIN\.([A-Z0-9]{10})\]',  # [ASIN.B0C34GQRYZ]
+            r'\[([A-Z0-9]{10})\]'         # [B0C34GQRYZ]
+        ]
         
+        for pattern in asin_patterns:
+            asin_match = re.search(pattern, result["book"])
+            if asin_match:
+                result["asin"] = asin_match.group(1)
+                break
+        
+        # Handle structured audiobook paths
         if "audiobooks" in parts:
             idx = parts.index("audiobooks")
             remaining = parts[idx+1:]
-            if len(remaining) >= 1:
+            
+            if len(remaining) >= 3:
+                # Pattern: /audiobooks/Author/Series/Book
                 result["author"] = remaining[0]
-            if len(remaining) >= 2:
-                # Check if it's a series folder
-                if len(remaining) == 3:
-                    result["series"] = remaining[1]
-                    result["book"] = remaining[2]
+                result["series"] = remaining[1] 
+                result["book"] = remaining[2]
+            elif len(remaining) == 2:
+                # Pattern: /audiobooks/Author/Book (no series)
+                result["author"] = remaining[0]
+                result["book"] = remaining[1]
+                result["series"] = ""
+            elif len(remaining) == 1:
+                # Pattern: /audiobooks/Book (flat structure)
+                result["book"] = remaining[0]
+                result["author"] = self._extract_author_from_title(result["book"])
+        else:
+            # Not in audiobooks folder - try to extract from filename/path
+            if len(parts) >= 3:
+                # Check if we're in a nested structure
+                parent = parts[-2]  # Series or Author
+                grandparent = parts[-3] if len(parts) >= 3 else ""
+                
+                # If grandparent looks like author and parent looks like series
+                if (self._looks_like_author(grandparent) and 
+                    not self._looks_like_author(parent)):
+                    result["author"] = grandparent
+                    result["series"] = parent
+                elif self._looks_like_author(parent):
+                    result["author"] = parent
                 else:
-                    result["book"] = remaining[1]
+                    result["author"] = self._extract_author_from_title(result["book"])
+            else:
+                result["author"] = self._extract_author_from_title(result["book"])
         
-        # Extract ASIN if present in book name (common pattern: "Title [ASIN]")
-        asin_match = re.search(r'\[([A-Z0-9]{10})\]', result["book"])
-        if asin_match:
-            result["asin"] = asin_match.group(1)
+        # Clean up and validate
+        if not result["author"] or result["author"] == "Unknown":
+            result["author"] = self._extract_author_from_title(result["book"]) or "Unknown"
+            
+        # Clean series name
+        if result["series"] and self._looks_like_book_title(result["series"]):
+            result["series"] = ""
         
         return result
+    
+    def _looks_like_author(self, name: str) -> bool:
+        """Check if a directory name looks like an author name"""
+        if not name:
+            return False
+            
+        # Skip common non-author directory names
+        skip_names = {
+            'audiobooks', 'downloads', 'books', 'audio', 'data', 'user', 'mnt',
+            'tmp', 'home', 'var', 'opt', 'media', 'library', 'collection', 'series'
+        }
+        
+        if name.lower() in skip_names:
+            return False
+        
+        # Author names typically have 1-4 words, reasonable length
+        words = name.split()
+        if len(words) > 4 or len(name) > 50:
+            return False
+        
+        # Check for patterns that indicate it's not an author
+        lower_name = name.lower()
+        bad_patterns = [
+            'vol_', 'volume', 'book', 'part', 'chapter', 'collection',
+            'unabridged', 'audiobook', 'litrpg', 'saga', 'series'
+        ]
+        
+        if any(pattern in lower_name for pattern in bad_patterns):
+            return False
+            
+        # Check for excessive special characters/numbers
+        special_count = sum(1 for c in name if not (c.isalnum() or c.isspace() or c in ".-'"))
+        if special_count > 2:
+            return False
+        
+        return True
+    
+    def _looks_like_book_title(self, name: str) -> bool:
+        """Check if a name looks more like a book title than a series name"""
+        if not name:
+            return False
+            
+        lower_name = name.lower()
+        book_indicators = [
+            'vol_', 'volume', 'book', 'part', 'chapter', 'episode',
+            'unabridged', '[', ']', '{', '}', 'audiobook'
+        ]
+        
+        return any(indicator in lower_name for indicator in book_indicators)
+    
+    def _extract_author_from_title(self, title: str) -> str:
+        """Try to extract author name from book title using common patterns"""
+        if not title:
+            return "Unknown"
+            
+        # Remove common suffixes and metadata
+        title = re.sub(r'\[.*?\]', '', title)  # Remove [metadata]
+        title = re.sub(r'\{.*?\}', '', title)  # Remove {metadata}
+        title = re.sub(r'\(.*?\)', '', title)  # Remove (metadata)
+        title = title.strip()
+        
+        # Pattern: "Author - Title" or "Author: Title"
+        for separator in [' - ', ': ', ' – ', ' — ']:
+            if separator in title:
+                parts = title.split(separator, 1)
+                potential_author = parts[0].strip()
+                if self._looks_like_author(potential_author):
+                    return potential_author
+        
+        # Pattern: "Title by Author"
+        by_match = re.search(r'\bby\s+([^,]+)', title, re.IGNORECASE)
+        if by_match:
+            potential_author = by_match.group(1).strip()
+            if self._looks_like_author(potential_author):
+                return potential_author
+        
+        # As last resort, try first few words
+        words = title.split()
+        if len(words) >= 2:
+            for i in range(1, min(3, len(words))):
+                potential_author = ' '.join(words[:i])
+                if self._looks_like_author(potential_author) and len(potential_author.split()) <= 3:
+                    return potential_author
+        
+        return "Unknown"
     
     def index_directory(self, root: Path, verbose: bool = False):
         """Index or update a directory tree"""
@@ -205,6 +326,243 @@ class AudiobookCatalog:
             FROM items
         """)
         return dict(cursor.fetchone())
+    
+    def rebuild_indexes(self, verbose: bool = False) -> Dict[str, Any]:
+        """Rebuild all database indexes for optimal performance"""
+        if verbose:
+            print(f"{Sty.YELLOW}Rebuilding database indexes...{Sty.RESET}")
+        
+        start_time = perf_counter()
+        
+        # Rebuild FTS5 index
+        if verbose:
+            print("  Rebuilding FTS5 index...")
+        self.conn.execute("INSERT INTO items_fts(items_fts) VALUES('rebuild')")
+        
+        # Rebuild regular indexes
+        if verbose:
+            print("  Rebuilding regular indexes...")
+        self.conn.execute("REINDEX idx_mtime")
+        self.conn.execute("REINDEX idx_path")
+        
+        # Analyze for query optimization
+        if verbose:
+            print("  Analyzing tables...")
+        self.conn.execute("ANALYZE items")
+        self.conn.execute("ANALYZE items_fts")
+        
+        self.conn.commit()
+        
+        elapsed = perf_counter() - start_time
+        if verbose:
+            print(f"{Sty.GREEN}✅ Indexes rebuilt in {elapsed:.2f}s{Sty.RESET}")
+        
+        return {"elapsed": elapsed}
+    
+    def clean_orphaned_entries(self, verbose: bool = False) -> Dict[str, int]:
+        """Remove entries for audiobooks that no longer exist on disk"""
+        if verbose:
+            print(f"{Sty.YELLOW}Cleaning orphaned catalog entries...{Sty.RESET}")
+        
+        cursor = self.conn.execute("SELECT id, path FROM items")
+        orphaned = []
+        
+        for row in cursor:
+            if not Path(row['path']).exists():
+                orphaned.append(row['id'])
+        
+        if not orphaned:
+            if verbose:
+                print(f"{Sty.GREEN}✅ No orphaned entries found{Sty.RESET}")
+            return {"removed": 0, "checked": len(list(cursor))}
+        
+        # Remove orphaned entries
+        placeholders = ','.join('?' * len(orphaned))
+        self.conn.execute(f"DELETE FROM items WHERE id IN ({placeholders})", orphaned)
+        self.conn.commit()
+        
+        if verbose:
+            print(f"{Sty.GREEN}✅ Removed {len(orphaned)} orphaned entries{Sty.RESET}")
+        
+        return {"removed": len(orphaned), "checked": len(list(cursor))}
+    
+    def optimize_database(self, verbose: bool = False) -> Dict[str, Any]:
+        """Run database optimization routines"""
+        if verbose:
+            print(f"{Sty.YELLOW}Optimizing database...{Sty.RESET}")
+        
+        start_time = perf_counter()
+        
+        # Get initial stats
+        initial_stats = self.get_db_stats()
+        
+        # Clean orphaned entries
+        clean_stats = self.clean_orphaned_entries(verbose)
+        
+        # Rebuild indexes
+        rebuild_stats = self.rebuild_indexes(verbose)
+        
+        # Vacuum to reclaim space
+        if verbose:
+            print("  Vacuuming database...")
+        self.conn.execute("VACUUM")
+        
+        # Final stats
+        final_stats = self.get_db_stats()
+        
+        elapsed = perf_counter() - start_time
+        
+        if verbose:
+            print(f"{Sty.GREEN}✅ Database optimized in {elapsed:.2f}s{Sty.RESET}")
+        
+        return {
+            "elapsed": elapsed,
+            "initial_size": initial_stats.get("db_size", 0),
+            "final_size": final_stats.get("db_size", 0),
+            "space_saved": initial_stats.get("db_size", 0) - final_stats.get("db_size", 0),
+            "orphaned_removed": clean_stats.get("removed", 0)
+        }
+    
+    def get_db_stats(self) -> Dict[str, Any]:
+        """Get detailed database statistics"""
+        stats = {}
+        
+        # Database file size
+        if DB_FILE.exists():
+            stats["db_size"] = DB_FILE.stat().st_size
+        
+        # Table statistics
+        cursor = self.conn.execute("""
+            SELECT 
+                'items' as table_name,
+                COUNT(*) as row_count
+            FROM items
+            UNION ALL
+            SELECT 
+                'items_fts' as table_name,
+                COUNT(*) as row_count
+            FROM items_fts
+        """)
+        
+        for row in cursor:
+            stats[f"{row['table_name']}_rows"] = row['row_count']
+        
+        # Index information
+        cursor = self.conn.execute("""
+            SELECT name, sql 
+            FROM sqlite_master 
+            WHERE type='index' AND name LIKE 'idx_%'
+        """)
+        
+        stats["indexes"] = [dict(row) for row in cursor]
+        
+        # FTS5 statistics
+        try:
+            cursor = self.conn.execute("SELECT * FROM items_fts('integrity-check')")
+            stats["fts_integrity"] = len(list(cursor)) == 0  # Empty result means OK
+        except sqlite3.OperationalError:
+            # Fallback: check if FTS table has same number of rows as items table
+            cursor = self.conn.execute("SELECT COUNT(*) FROM items")
+            items_count = cursor.fetchone()[0]
+            cursor = self.conn.execute("SELECT COUNT(*) FROM items_fts")
+            fts_count = cursor.fetchone()[0]
+            stats["fts_integrity"] = items_count == fts_count
+        
+        return stats
+    
+    def get_index_stats(self) -> Dict[str, Any]:
+        """Get index usage and performance statistics"""
+        stats = {}
+        
+        # Index sizes (approximate)
+        cursor = self.conn.execute("""
+            SELECT 
+                name,
+                'index' as type
+            FROM sqlite_master 
+            WHERE type='index'
+            UNION ALL
+            SELECT 
+                name,
+                'table' as type
+            FROM sqlite_master 
+            WHERE type='table'
+        """)
+        
+        stats["objects"] = [dict(row) for row in cursor]
+        
+        # Query performance hints
+        cursor = self.conn.execute("EXPLAIN QUERY PLAN SELECT * FROM items WHERE mtime > ? ORDER BY mtime DESC", (0,))
+        stats["query_plan_mtime"] = [dict(row) for row in cursor]
+        
+        cursor = self.conn.execute("EXPLAIN QUERY PLAN SELECT * FROM items WHERE path LIKE ?", ("%",))
+        stats["query_plan_path"] = [dict(row) for row in cursor]
+        
+        return stats
+    
+    def vacuum_database(self, verbose: bool = False) -> Dict[str, int]:
+        """Reclaim unused database space"""
+        if verbose:
+            print(f"{Sty.YELLOW}Vacuuming database...{Sty.RESET}")
+        
+        start_size = DB_FILE.stat().st_size if DB_FILE.exists() else 0
+        
+        self.conn.execute("VACUUM")
+        
+        end_size = DB_FILE.stat().st_size if DB_FILE.exists() else 0
+        space_saved = start_size - end_size
+        
+        if verbose:
+            print(f"{Sty.GREEN}✅ Reclaimed {space_saved / (1024*1024):.1f} MB{Sty.RESET}")
+        
+        return {"space_saved": space_saved, "final_size": end_size}
+    
+    def verify_integrity(self, verbose: bool = False) -> Dict[str, Any]:
+        """Verify database integrity and FTS5 consistency"""
+        if verbose:
+            print(f"{Sty.YELLOW}Verifying database integrity...{Sty.RESET}")
+        
+        results = {}
+        
+        # SQLite integrity check
+        cursor = self.conn.execute("PRAGMA integrity_check")
+        integrity_result = list(cursor)
+        results["sqlite_integrity"] = integrity_result[0][0] == "ok"
+        
+        # FTS5 integrity check
+        try:
+            cursor = self.conn.execute("SELECT * FROM items_fts('integrity-check')")
+            fts_issues = list(cursor)
+            results["fts_integrity"] = len(fts_issues) == 0
+        except sqlite3.OperationalError:
+            # Fallback: check if FTS table has same number of rows as items table
+            cursor = self.conn.execute("SELECT COUNT(*) FROM items")
+            items_count = cursor.fetchone()[0]
+            cursor = self.conn.execute("SELECT COUNT(*) FROM items_fts")
+            fts_count = cursor.fetchone()[0]
+            results["fts_integrity"] = items_count == fts_count
+        
+        # Check for orphaned FTS entries
+        cursor = self.conn.execute("""
+            SELECT COUNT(*) as orphaned_fts
+            FROM items_fts 
+            WHERE rowid NOT IN (SELECT id FROM items)
+        """)
+        results["orphaned_fts_count"] = cursor.fetchone()[0]
+        
+        # Check for missing FTS entries
+        cursor = self.conn.execute("""
+            SELECT COUNT(*) as missing_fts
+            FROM items 
+            WHERE id NOT IN (SELECT rowid FROM items_fts)
+        """)
+        results["missing_fts_count"] = cursor.fetchone()[0]
+        
+        if verbose:
+            status = "✅ OK" if all(v is not False for v in results.values() if v is not None) else "❌ ISSUES FOUND"
+            print(f"{Sty.GREEN if all(v is not False for v in results.values() if v is not None) else Sty.RED}{status}{Sty.RESET}")
+        
+        return results
     
     def close(self):
         self.conn.close()
@@ -668,7 +1026,6 @@ def index_command(args):
     if not args.roots:
         args.roots = [
             "/mnt/user/data/audio/audiobooks",
-            "/mnt/user/data/downloads",
             Path.home() / "audiobooks"
         ]
     
@@ -688,6 +1045,68 @@ def index_command(args):
         print(f"  Unique authors: {stats['authors']}")
         print(f"  Unique series: {stats['series']}")
         print(f"  Total size: {stats['total_size'] / (1024**3):.1f} GB")
+    
+    catalog.close()
+
+def manage_command(args):
+    """Database index management"""
+    catalog = AudiobookCatalog()
+    verbose = not args.quiet
+    
+    try:
+        if args.action == 'rebuild':
+            result = catalog.rebuild_indexes(verbose)
+            if verbose:
+                print(f"{Sty.GREEN}✅ Indexes rebuilt successfully{Sty.RESET}")
+            
+        elif args.action == 'clean':
+            result = catalog.clean_orphaned_entries(verbose)
+            if verbose:
+                print(f"{Sty.GREEN}✅ Cleaned {result['removed']} orphaned entries{Sty.RESET}")
+            
+        elif args.action == 'optimize':
+            result = catalog.optimize_database(verbose)
+            if verbose:
+                print(f"{Sty.GREEN}✅ Database optimized{Sty.RESET}")
+                print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
+                print(f"  Time taken: {result['elapsed']:.2f}s")
+            
+        elif args.action == 'stats':
+            db_stats = catalog.get_db_stats()
+            idx_stats = catalog.get_index_stats()
+            
+            print(f"{Sty.CYAN}Database Statistics:{Sty.RESET}")
+            print(f"  Database size: {db_stats.get('db_size', 0) / (1024*1024):.1f} MB")
+            print(f"  Items table: {db_stats.get('items_rows', 0)} rows")
+            print(f"  FTS table: {db_stats.get('items_fts_rows', 0)} rows")
+            print(f"  Indexes: {len(db_stats.get('indexes', []))}")
+            
+            if db_stats.get('fts_integrity') is False:
+                print(f"{Sty.YELLOW}  ⚠️  FTS integrity issues detected{Sty.RESET}")
+            
+        elif args.action == 'vacuum':
+            result = catalog.vacuum_database(verbose)
+            if verbose:
+                print(f"{Sty.GREEN}✅ Database vacuumed{Sty.RESET}")
+                print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
+            
+        elif args.action == 'verify':
+            result = catalog.verify_integrity(verbose)
+            
+            print(f"{Sty.CYAN}Integrity Check Results:{Sty.RESET}")
+            print(f"  SQLite integrity: {'✅ OK' if result['sqlite_integrity'] else '❌ FAILED'}")
+            print(f"  FTS integrity: {'✅ OK' if result['fts_integrity'] else '❌ FAILED'}")
+            print(f"  Orphaned FTS entries: {result['orphaned_fts_count']}")
+            print(f"  Missing FTS entries: {result['missing_fts_count']}")
+            
+            if not all(v is not False for v in result.values() if v is not None):
+                print(f"{Sty.YELLOW}⚠️  Issues found - consider running 'optimize'{Sty.RESET}")
+    
+    except Exception as e:
+        print(f"{Sty.RED}❌ Error during {args.action}: {e}{Sty.RESET}")
+        if verbose:
+            import traceback
+            traceback.print_exc()
     
     catalog.close()
 
@@ -1496,6 +1915,7 @@ def main():
                "  hardbound                    # Interactive mode\n"
                "  hardbound index              # Build search catalog\n"
                "  hardbound select -m          # Search and multi-select\n"
+               "  hardbound manage optimize    # Database maintenance\n"
                "  hardbound --src X --dst Y    # Classic single link",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
@@ -1524,6 +1944,12 @@ def main():
     select_parser.add_argument('--dst-root', type=Path, help='Destination root for linking')
     select_parser.add_argument('--dry-run', action='store_true', help='Preview only')
     
+    # Manage command
+    manage_parser = subparsers.add_parser('manage', help='Database index management')
+    manage_parser.add_argument('action', choices=['rebuild', 'clean', 'optimize', 'stats', 'vacuum', 'verify'], 
+                              help='Management action to perform')
+    manage_parser.add_argument('-q', '--quiet', action='store_true', help='Quiet mode')
+    
     # Classic arguments (for backward compatibility)
     ap.add_argument("--src", type=Path, help="Source album directory")
     ap.add_argument("--dst", type=Path, help="Destination album directory")
@@ -1550,6 +1976,8 @@ def main():
         search_command(args)
     elif args.command == 'select':
         select_command(args)
+    elif args.command == 'manage':
+        manage_command(args)
     elif args.src or args.batch_file:
         # Classic CLI mode
         _classic_cli_mode(args)

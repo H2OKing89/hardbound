@@ -64,6 +64,55 @@ Hardbound is a powerful command-line tool for managing large audiobook libraries
 - `index [paths...]`: Build/update searchable catalog
 - `search [terms]`: Search catalog with filters
 - `select [terms]`: Interactive selection with fzf
+- `manage <command>`: Database maintenance and index management
+
+### Index Management Commands
+- `manage rebuild`: Rebuild database indexes for optimal performance
+- `manage clean`: Remove orphaned entries and clean up database
+- `manage optimize`: Optimize database structure and indexes
+- `manage stats`: Display database statistics and index information
+- `manage vacuum`: Reclaim disk space and defragment database
+- `manage verify`: Verify database integrity and consistency
+
+## Index Management
+
+Hardbound includes comprehensive database maintenance tools to keep your audiobook catalog running smoothly:
+
+### Database Maintenance
+```bash
+# Rebuild indexes for optimal search performance
+./hardbound.py manage rebuild
+
+# Clean up orphaned entries and remove invalid paths
+./hardbound.py manage clean
+
+# Optimize database structure and indexes
+./hardbound.py manage optimize
+
+# View database statistics and index information
+./hardbound.py manage stats
+
+# Reclaim disk space and defragment database
+./hardbound.py manage vacuum
+
+# Verify database integrity
+./hardbound.py manage verify
+```
+
+### Automatic Maintenance
+The system automatically handles:
+- **Path parsing**: Correctly identifies author/series/book structure
+- **ASIN extraction**: Supports multiple ASIN formats ({ASIN.B0C34GQRYZ}, [ASIN.B0CN7M36GD])
+- **Duplicate detection**: Prevents duplicate catalog entries
+- **Orphaned cleanup**: Removes entries for deleted audiobooks
+- **Index optimization**: Maintains search performance for large libraries
+
+### Directory Structure Support
+Hardbound intelligently parses audiobook directory structures:
+- `Author/Series/Book/` - Full hierarchical organization
+- `Author/Book/` - Direct author-to-book mapping
+- Automatic exclusion of torrent destination folders
+- Pattern-based author and series detection
 
 ### Interactive Mode
 Run without arguments for full interactive menu:
@@ -112,7 +161,7 @@ Configuration is stored in `~/.config/hardbound/config.json`:
 
 ## Requirements
 
-- Python 3.6+
+- Python 3.8+
 - SQLite3 (usually included with Python)
 - Optional: fzf for enhanced fuzzy search
 - Optional: tqdm for progress bars
