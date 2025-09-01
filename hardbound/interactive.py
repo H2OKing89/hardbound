@@ -15,6 +15,10 @@ from .catalog import DB_FILE, AudiobookCatalog
 from .config import load_config, save_config
 from .display import Sty, summary_table
 from .linker import plan_and_link, zero_pad_vol
+from .ui.menu import menu_system, create_main_menu
+from .ui.feedback import VisualFeedback, ErrorHandler
+from .utils.validation import PathValidator, InputValidator
+from .utils.validation import PathValidator, InputValidator
 
 
 def _get_recent_sources(config):
@@ -426,84 +430,138 @@ def fallback_picker(candidates: List[Dict], multi: bool) -> List[str]:
 
 
 def interactive_mode():
-    """Enhanced interactive mode with search-first workflow"""
+    """Enhanced interactive mode with improved UX"""
     config = load_config()
 
-    # Check if catalog exists
+    # Initialize catalog if needed
     if not DB_FILE.exists():
-        print(f"{Sty.YELLOW}No catalog found. Building index...{Sty.RESET}")
+        VisualFeedback.info("No catalog found. Building index...")
+        progress = ProgressIndicator("Building catalog")
+        progress.start()
+
         catalog = AudiobookCatalog()
-        catalog.index_directory(Path("/mnt/user/data/audio/audiobooks"), verbose=True)
+        default_path = PathValidator.get_default_search_paths()
+        if default_path:
+            catalog.index_directory(default_path[0], verbose=False)
         catalog.close()
 
+        progress.done()
+
+    # First run setup with better UX
     if config.get("first_run", True):
-        print(
-            f"""
-{Sty.CYAN}╔══════════════════════════════════════════════╗
-║      WELCOME TO HARDBOUND - FIRST RUN        ║
-╚══════════════════════════════════════════════╝{Sty.RESET}
+        _first_run_setup(config)
 
-Let's set up your default paths:
-"""
-        )
+    # Create main menu
+    create_main_menu()
 
-        library = input(f"{Sty.BOLD}Audiobook library path: {Sty.RESET}").strip()
-        if library:
-            config["library_path"] = library
-
-        torrent = input(f"{Sty.BOLD}Torrent destination root: {Sty.RESET}").strip()
-        if torrent:
-            config["torrent_path"] = torrent
-
-        config["first_run"] = False
-        save_config(config)
-        print(f"{Sty.GREEN}✅ Settings saved!{Sty.RESET}\n")
-
-    while True:
-        print(
-            f"""
-{Sty.CYAN}╔══════════════════════════════════════════════╗
-║     📚 AUDIOBOOK HARDLINK MANAGER 📚         ║
-╚══════════════════════════════════════════════╝{Sty.RESET}
-
-What would you like to do?
-
-{Sty.GREEN}1{Sty.RESET}) 🔍 Search and link audiobooks (recommended)
-{Sty.GREEN}2{Sty.RESET}) 📊 Update catalog index
-{Sty.GREEN}3{Sty.RESET}) 🔗 Link recent downloads
-{Sty.GREEN}4{Sty.RESET}) 📁 Browse by folder (legacy)
-{Sty.GREEN}5{Sty.RESET}) ⚙️  Settings & Preferences
-{Sty.GREEN}6{Sty.RESET}) ❓ Help & Tutorial
-{Sty.GREEN}7{Sty.RESET}) 🚪 Exit
-
-"""
-        )
-        choice = input("Enter your choice (1-7): ").strip()
-
+    # Main interaction loop
+    running = True
+    while running:
         try:
-            if choice == "1":
-                search_and_link_wizard()
-            elif choice == "2":
-                update_catalog_wizard()
-            elif choice == "3":
-                recent_downloads_scanner()
-            elif choice == "4":
-                folder_batch_wizard()
-            elif choice == "5":
-                settings_menu()
-                config = load_config()  # Reload after settings change
-            elif choice == "6":
-                show_interactive_help()
-            elif choice == "7" or choice.lower() in ["q", "quit", "exit"]:
-                print(f"{Sty.CYAN}👋 Goodbye!{Sty.RESET}")
-                break
+            choice = menu_system.display_menu('main')
+            if choice:
+                running = menu_system.handle_choice('main', choice)
             else:
-                print(f"{Sty.YELLOW}Please enter 1-7{Sty.RESET}")
+                running = False
+
         except KeyboardInterrupt:
-            print(f"\n{Sty.CYAN}👋 Goodbye!{Sty.RESET}")
-            break
+            VisualFeedback.info("Goodbye!")
+            running = False
         except Exception as e:
-            print(f"{Sty.RED}❌ Error: {e}{Sty.RESET}")
+            ErrorHandler.handle_operation_error(e, "menu operation")
+            running = False
+
+
+def _first_run_setup(config):
+    """Enhanced first run setup with validation"""
+    VisualFeedback.info_box(
+        "Welcome to Hardbound!",
+        {
+            "Setup": "Let's configure your paths",
+            "Tip": "You can change these later in Settings"
+        }
+    )
+
+    # Library path setup
+    library_path = None
+    while not library_path:
+        path_str = input(f"{Sty.CYAN}➤{Sty.RESET} Audiobook library path: ").strip()
+        if not path_str:
+            # Try to auto-detect
+            defaults = PathValidator.get_default_search_paths()
+            if defaults:
+                if InputValidator.confirm_action(f"Use {defaults[0]}?"):
+                    library_path = defaults[0]
+                else:
+                    continue
+            else:
+                VisualFeedback.warning("No path provided", "You can set this later in Settings")
+                break
+        else:
+            library_path = PathValidator.validate_library_path(path_str)
+
+    if library_path:
+        config["library_path"] = str(library_path)
+
+    # Destination path setup
+    dest_path = None
+    while not dest_path:
+        path_str = input(f"{Sty.CYAN}➤{Sty.RESET} Torrent destination root: ").strip()
+        if not path_str:
+            VisualFeedback.warning("No destination provided", "You can set this later in Settings")
+            break
+
+        dest_path = PathValidator.validate_destination_path(path_str)
+
+    if dest_path:
+        config["torrent_path"] = str(dest_path)
+
+    config["first_run"] = False
+    save_config(config)
+    VisualFeedback.success("Setup complete!", "Your preferences have been saved")
+
+
+# Progress indicator for long operations
+class ProgressIndicator:
+    """Visual progress feedback for long operations"""
+
+    def __init__(self, title: str, total: Optional[int] = None):
+        self.title = title
+        self.total = total
+        self.current = 0
+        self.start_time = None
+
+    def start(self):
+        """Start the progress indicator"""
+        import time
+        self.start_time = time.time()
+        print(f"{Sty.CYAN}⏳{Sty.RESET} {self.title}...")
+
+    def update(self, message: str = ""):
+        """Update progress"""
+        self.current += 1
+
+        if self.total:
+            VisualFeedback.progress_bar(self.current, self.total, message)
+        else:
+            frame = self.current % 10
+            VisualFeedback.spinner(frame, f"{self.title}: {message}")
+
+    def done(self, message: str = "Complete"):
+        """Mark as complete"""
+        if self.total:
+            VisualFeedback.progress_bar(self.total, self.total, message)
+
+        elapsed = None
+        if self.start_time:
+            import time
+            elapsed = time.time() - self.start_time
+
+        detail = ""
+        if elapsed:
+            detail = f"({elapsed:.1f}s)"
+
+        VisualFeedback.success(f"{self.title} {message}", detail)
 
 
 def search_and_link_wizard():
@@ -876,11 +934,20 @@ def find_recent_audiobooks(hours=24, max_depth=3):
     cutoff = datetime.now().timestamp() - (hours * 3600)
 
     search_paths = [
-        "/mnt/user/data/audio/audiobooks",
-        "/mnt/user/data/downloads",
         Path.home() / "audiobooks",
         Path.home() / "Downloads",
+        Path.home() / "Documents" / "audiobooks",
     ]
+
+    # Add system-specific paths if they exist
+    system_paths = [
+        Path("/mnt/user/data/audio/audiobooks"),
+        Path("/mnt/user/data/downloads"),
+    ]
+
+    for sys_path in system_paths:
+        if sys_path.exists():
+            search_paths.append(sys_path)
 
     for base_path in search_paths:
         if not Path(base_path).exists():
