@@ -22,7 +22,7 @@ class Sty:
     BOLD = "bold"
     DIM = "dim"
     ITAL = "italic"
-    GREY = "gray"
+    GREY = "grey"
     RED = "red"
     GREEN = "green"
     YELLOW = "yellow"
@@ -82,7 +82,7 @@ def row(
         Sty.BLUE: "blue",
         Sty.YELLOW: "yellow",
         Sty.RED: "red",
-        Sty.GREY: "gray",
+        Sty.GREY: "grey",
         Sty.CYAN: "cyan",
         Sty.MAGENTA: "magenta",
     }
@@ -112,10 +112,10 @@ def summary_table(stats: dict, elapsed: float):
 
     table.add_row("linked", str(stats["linked"]), style="green")
     table.add_row("replaced", str(stats["replaced"]), style="blue")
-    table.add_row("already", str(stats["already"]), style="gray")
+    table.add_row("already", str(stats["already"]), style="grey")
     table.add_row("exists", str(stats["exists"]), style="yellow")
-    table.add_row("excluded", str(stats["excluded"]), style="gray")
-    table.add_row("skipped", str(stats["skipped"]), style="gray")
+    table.add_row("excluded", str(stats["excluded"]), style="grey")
+    table.add_row("skipped", str(stats["skipped"]), style="grey")
     table.add_row("errors", str(stats["errors"]), style="red")
 
     console.print(table)

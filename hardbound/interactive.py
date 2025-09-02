@@ -84,7 +84,7 @@ def hierarchical_browser(catalog) -> List[str]:
                 row.append(f"[yellow]{initial}[/yellow]({count:2d})")
             else:
                 row.append("      ")
-        print("  " + "  ".join(row))
+        console.print("  " + "  ".join(row))
 
     console.print(f"\n[yellow]Enter letter(s), or 'search' for text search:[/yellow]")
     choice = input("Choice: ").strip().upper()
@@ -608,7 +608,8 @@ def _first_run_setup(config):
     # Library path setup
     library_path = None
     while not library_path:
-        path_str = input(f"[cyan]➤[/cyan] Audiobook library path: ").strip()
+        console.print(f"[cyan]➤[/cyan] Audiobook library path: ", end="")
+        path_str = input().strip()
         if not path_str:
             # Try to auto-detect
             defaults = PathValidator.get_default_search_paths()
@@ -632,7 +633,8 @@ def _first_run_setup(config):
     # Destination path setup
     dest_path = None
     while not dest_path:
-        path_str = input(f"[cyan]➤[/cyan] Torrent destination root: ").strip()
+        console.print(f"[cyan]➤[/cyan] Torrent destination root: ", end="")
+        path_str = input().strip()
         if not path_str:
             feedback = VisualFeedback()
             feedback.warning(
@@ -916,7 +918,7 @@ def maintenance_menu():
     console.print(f"\n[cyan]🛠️ DATABASE MAINTENANCE[/cyan]")
 
     while True:
-        print(
+        console.print(
             f"""
 [yellow]Database maintenance options:[/yellow]
 
@@ -945,10 +947,10 @@ def maintenance_menu():
                 db_stats = catalog.get_db_stats()
                 idx_stats = catalog.get_index_stats()
 
-                print(f"  Database size: {db_stats.get('db_size', 0) / (1024*1024):.1f} MB")
-                print(f"  Items table: {db_stats.get('items_rows', 0)} rows")
-                print(f"  FTS table: {db_stats.get('items_fts_rows', 0)} rows")
-                print(f"  Indexes: {len(db_stats.get('indexes', []))}")
+                console.print(f"  Database size: {db_stats.get('db_size', 0) / (1024*1024):.1f} MB")
+                console.print(f"  Items table: {db_stats.get('items_rows', 0)} rows")
+                console.print(f"  FTS table: {db_stats.get('items_fts_rows', 0)} rows")
+                console.print(f"  Indexes: {len(db_stats.get('indexes', []))}")
 
                 if db_stats.get("fts_integrity") is False:
                     console.print(f"[yellow]  ⚠️  FTS integrity issues detected[/yellow]")
@@ -957,24 +959,24 @@ def maintenance_menu():
                 console.print(f"\n[cyan]⚡ Optimizing database...[/cyan]")
                 result = catalog.optimize_database(True)
                 console.print(f"[green]✅ Database optimized[/green]")
-                print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
-                print(f"  Time taken: {result['elapsed']:.2f}s")
+                console.print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
+                console.print(f"  Time taken: {result['elapsed']:.2f}s")
 
             elif choice == "4":
                 console.print(f"\n[cyan]🧽 Vacuuming database...[/cyan]")
                 result = catalog.vacuum_database(True)
                 console.print(f"[green]✅ Database vacuumed[/green]")
-                print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
+                console.print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
 
             elif choice == "5":
                 console.print(f"\n[cyan]🔍 Verifying database integrity...[/cyan]")
                 result = catalog.verify_integrity(True)
 
                 console.print(f"[cyan]Integrity Check Results:[/cyan]")
-                print(f"  SQLite integrity: {'✅ OK' if result['sqlite_integrity'] else '❌ FAILED'}")
-                print(f"  FTS integrity: {'✅ OK' if result['fts_integrity'] else '❌ FAILED'}")
-                print(f"  Orphaned FTS entries: {result['orphaned_fts_count']}")
-                print(f"  Missing FTS entries: {result['missing_fts_count']}")
+                console.print(f"  SQLite integrity: {'✅ OK' if result['sqlite_integrity'] else '❌ FAILED'}")
+                console.print(f"  FTS integrity: {'✅ OK' if result['fts_integrity'] else '❌ FAILED'}")
+                console.print(f"  Orphaned FTS entries: {result['orphaned_fts_count']}")
+                console.print(f"  Missing FTS entries: {result['missing_fts_count']}")
 
                 if not all(v is not False for v in result.values() if v is not None):
                     console.print(f"[yellow]⚠️  Issues found - consider running 'optimize'[/yellow]")
@@ -998,7 +1000,8 @@ def maintenance_menu():
         finally:
             catalog.close()
 
-        input(f"\n[yellow]Press Enter to continue...[/yellow]")
+        console.print(f"\n[yellow]Press Enter to continue...[/yellow]")
+        input()
 
 
 def settings_menu():
@@ -1008,7 +1011,7 @@ def settings_menu():
     console.print(f"\n[cyan]⚙️ SETTINGS MENU[/cyan]")
 
     while True:
-        print(
+        console.print(
             f"""
 [yellow]Current settings:[/yellow]
   Library path: {config.get('library_path', '')}

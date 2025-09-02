@@ -1454,11 +1454,13 @@ Let's set up your default paths:
 """
         )
 
-        library = input(f"[bold]Audiobook library path: [/bold]").strip()
+        console.print(f"[bold]Audiobook library path: [/bold]", end="")
+        library = input().strip()
         if library:
             config["library_path"] = library
 
-        torrent = input(f"[bold]Torrent destination root: [/bold]").strip()
+        console.print(f"[bold]Torrent destination root: [/bold]", end="")
+        torrent = input().strip()
         if torrent:
             config["torrent_path"] = torrent
 
