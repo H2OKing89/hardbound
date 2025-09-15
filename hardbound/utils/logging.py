@@ -4,6 +4,7 @@ Structured logging with Rich console output and JSON file logging
 Provides context binding for ASIN, title, volume, and job tracking
 """
 from __future__ import annotations
+
 import json
 import logging
 from logging import Logger
@@ -12,28 +13,30 @@ from pathlib import Path
 from typing import Optional
 
 import structlog
-from structlog.stdlib import LoggerFactory, add_log_level, filter_by_level
-from structlog.processors import TimeStamper
-from structlog.dev import ConsoleRenderer
 from structlog.contextvars import (
     bind_contextvars,
-    unbind_contextvars,
-    merge_contextvars,
     clear_contextvars,
+    merge_contextvars,
+    unbind_contextvars,
 )
+from structlog.dev import ConsoleRenderer
+from structlog.processors import TimeStamper
+from structlog.stdlib import LoggerFactory, add_log_level, filter_by_level
 
 try:
     from rich.logging import RichHandler
+
     _HAS_RICH = True
 except ImportError:
     _HAS_RICH = False
 
 # ---- public helpers ---------------------------------------------------------
 
+
 def get_logger(name: Optional[str] = None) -> structlog.stdlib.BoundLogger:
     """
     Get a structlog logger bound to the app. Use .bind(asin="…") to add context.
-    
+
     Example:
         log = get_logger(__name__)
         bound_log = log.bind(asin="{ASIN.B0ABC123}", title="Book Title")
@@ -42,19 +45,24 @@ def get_logger(name: Optional[str] = None) -> structlog.stdlib.BoundLogger:
     base = structlog.get_logger(name or "hardbound")
     return base
 
+
 def bind(**kw) -> None:
     """Bind key=value to the implicit context (thread/Task-local)."""
     bind_contextvars(**kw)
+
 
 def unbind(*keys: str) -> None:
     """Remove keys from the implicit context."""
     unbind_contextvars(*keys)
 
+
 def clear_context() -> None:
     """Clear all context variables."""
     clear_contextvars()
 
+
 # ---- setup ------------------------------------------------------------------
+
 
 def setup_logging(
     *,
@@ -73,7 +81,7 @@ def setup_logging(
       - Rich console (human readable)
       - Rotating JSON file (machine readable)
     Call this ONCE at program start (CLI entrypoint).
-    
+
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR)
         file_enabled: Enable file logging
@@ -84,7 +92,7 @@ def setup_logging(
         rotate_backups: Number of backup files to keep
         rich_tracebacks: Enable Rich traceback formatting
         show_path: Show file paths in Rich console output
-        
+
     Returns:
         Configured stdlib logger for compatibility
     """
@@ -122,16 +130,12 @@ def setup_logging(
 
     # Configure standard library root logger
     root_level = getattr(logging, level.upper(), logging.INFO)
-    
+
     # Clear any existing handlers to avoid duplicates
     logging.getLogger().handlers.clear()
-    
+
     # Configure basic logging
-    logging.basicConfig(
-        handlers=handlers, 
-        level=root_level, 
-        format="%(message)s"
-    )
+    logging.basicConfig(handlers=handlers, level=root_level, format="%(message)s")
 
     # Configure structlog processors
     timestamper = TimeStamper(fmt="iso", utc=True)
@@ -189,50 +193,50 @@ def setup_logging(
     # Return a conventional stdlib logger for compatibility
     return logging.getLogger("hardbound")
 
+
 # ---- context helpers --------------------------------------------------------
+
 
 def bind_audiobook_context(asin: str, title: str, volume: str, **extra) -> None:
     """
     Convenience function to bind common audiobook context.
-    
+
     Args:
         asin: ASIN token (e.g., "{ASIN.B0ABC123}")
         title: Book title
         volume: Volume (e.g., "vol_01")
         **extra: Additional context to bind
     """
-    context = {
-        "asin": asin,
-        "title": title,
-        "volume": volume,
-        **extra
-    }
+    context = {"asin": asin, "title": title, "volume": volume, **extra}
     bind_contextvars(**context)
 
-def bind_operation_context(operation: str, job_id: Optional[str] = None, **extra) -> None:
+
+def bind_operation_context(
+    operation: str, job_id: Optional[str] = None, **extra
+) -> None:
     """
     Convenience function to bind operation context.
-    
+
     Args:
         operation: Operation name (e.g., "link", "trim", "scan")
         job_id: Unique job identifier
         **extra: Additional context to bind
     """
-    context = {
-        "operation": operation,
-        **extra
-    }
+    context = {"operation": operation, **extra}
     if job_id:
         context["job_id"] = job_id
-    
+
     bind_contextvars(**context)
 
+
 # ---- validation -------------------------------------------------------------
+
 
 def validate_log_level(level: str) -> bool:
     """Validate that a log level string is valid."""
     valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
     return level.upper() in valid_levels
+
 
 def get_log_size(log_path: Path) -> int:
     """Get the current size of the log file in bytes."""
@@ -240,6 +244,7 @@ def get_log_size(log_path: Path) -> int:
         return log_path.stat().st_size
     except (OSError, FileNotFoundError):
         return 0
+
 
 def list_log_files(log_dir: Path) -> list[Path]:
     """List all log files in the log directory (including rotated ones)."""

@@ -25,8 +25,12 @@ except ImportError:
 
 from rich.console import Console
 
-from .display import Sty, row, banner, section, term_width
-from .linker import set_file_permissions_and_ownership, set_dir_permissions_and_ownership, plan_and_link_red
+from .display import Sty, banner, row, section, term_width
+from .linker import (
+    plan_and_link_red,
+    set_dir_permissions_and_ownership,
+    set_file_permissions_and_ownership,
+)
 
 # Global console instance
 console = Console()
@@ -34,28 +38,28 @@ console = Console()
 
 def parse_selection_input(input_str: str, max_items: int) -> List[int]:
     """Parse selection input with support for ranges and comma-separated values.
-    
+
     Examples:
     - "1,3,5" -> [0, 2, 4]
     - "1-5" -> [0, 1, 2, 3, 4]
     - "1-3,7,9-11" -> [0, 1, 2, 6, 8, 9, 10]
-    
+
     Returns 0-based indices.
     """
     indices = set()
-    
+
     # Split by commas and handle each part
-    for part in input_str.replace(' ', '').split(','):
+    for part in input_str.replace(" ", "").split(","):
         if not part:
             continue
-            
-        if '-' in part:
+
+        if "-" in part:
             # Handle range (e.g., "1-5")
             try:
-                start_str, end_str = part.split('-', 1)
+                start_str, end_str = part.split("-", 1)
                 start = int(start_str)
                 end = int(end_str)
-                
+
                 # Convert to 0-based and validate
                 if start >= 1 and end >= 1 and start <= max_items and end <= max_items:
                     for i in range(min(start, end), max(start, end) + 1):
@@ -72,8 +76,9 @@ def parse_selection_input(input_str: str, max_items: int) -> List[int]:
             except ValueError:
                 # Skip invalid numbers
                 continue
-    
+
     return sorted(list(indices))
+
 
 # -------------------------
 # Exclusions (DESTINATION)
@@ -1270,14 +1275,16 @@ def fallback_picker(candidates: List[Dict], multi: bool) -> List[str]:
         console.print(f"  • Enter [green]all[/green] to select everything")
         console.print(f"  • Press Enter without input to cancel")
         choice = input("\nSelection: ").strip()
-        
+
         if choice.lower() == "all":
             return [c["path"] for c in candidates]
         elif not choice:
             return []
 
         selected_indices = parse_selection_input(choice, len(candidates))
-        return [candidates[i]["path"] for i in selected_indices if 0 <= i < len(candidates)]
+        return [
+            candidates[i]["path"] for i in selected_indices if 0 <= i < len(candidates)
+        ]
     else:
         choice = input("\nEnter number: ").strip()
         if choice.isdigit():
@@ -1448,11 +1455,11 @@ def select_command(args):
     # If --link flag is set, proceed to linking
     if args.link:
         config = load_config()
-        
+
         # Handle integration selection
         dst_root = None
         path_limit = None
-        
+
         if args.integration:
             # Use specified integration
             integrations = config.get("integrations", {})
@@ -1460,17 +1467,23 @@ def select_command(args):
                 integration_config = integrations[args.integration]
                 if isinstance(integration_config, dict):
                     if not integration_config.get("enabled", False):
-                        console.print(f"[red]❌ {args.integration.upper()} integration is disabled[/red]")
+                        console.print(
+                            f"[red]❌ {args.integration.upper()} integration is disabled[/red]"
+                        )
                         catalog.close()
                         return
                     dst_root = Path(integration_config.get("path", ""))
                     path_limit = integration_config.get("path_limit")
                 else:
-                    console.print(f"[red]❌ Invalid configuration for {args.integration.upper()} integration[/red]")
+                    console.print(
+                        f"[red]❌ Invalid configuration for {args.integration.upper()} integration[/red]"
+                    )
                     catalog.close()
                     return
             else:
-                console.print(f"[red]❌ {args.integration.upper()} integration not found[/red]")
+                console.print(
+                    f"[red]❌ {args.integration.upper()} integration not found[/red]"
+                )
                 catalog.close()
                 return
         elif args.dst_root:
@@ -1482,26 +1495,40 @@ def select_command(args):
             enabled_integrations = []
             if isinstance(integrations, dict):
                 for name, int_config in integrations.items():
-                    if isinstance(int_config, dict) and int_config.get("enabled", False):
+                    if isinstance(int_config, dict) and int_config.get(
+                        "enabled", False
+                    ):
                         enabled_integrations.append((name, int_config))
-            
+
             if len(enabled_integrations) == 1:
                 integration_name, integration_config = enabled_integrations[0]
                 dst_root = Path(integration_config.get("path", ""))
                 path_limit = integration_config.get("path_limit")
-                console.print(f"[cyan]Using {integration_name.upper()} integration: {dst_root}[/cyan]")
+                console.print(
+                    f"[cyan]Using {integration_name.upper()} integration: {dst_root}[/cyan]"
+                )
             elif len(enabled_integrations) > 1:
-                console.print(f"[yellow]Multiple integrations available. Use --integration to specify:[/yellow]")
+                console.print(
+                    f"[yellow]Multiple integrations available. Use --integration to specify:[/yellow]"
+                )
                 for name, int_config in enabled_integrations:
-                    limit_str = f" (limit: {int_config.get('path_limit')} chars)" if int_config.get('path_limit') else ""
-                    console.print(f"  --integration {name}{limit_str}: {int_config.get('path', '')}")
+                    limit_str = (
+                        f" (limit: {int_config.get('path_limit')} chars)"
+                        if int_config.get("path_limit")
+                        else ""
+                    )
+                    console.print(
+                        f"  --integration {name}{limit_str}: {int_config.get('path', '')}"
+                    )
                 catalog.close()
                 return
             else:
-                console.print(f"[red]❌ No enabled integrations found. Use --dst-root or configure an integration[/red]")
+                console.print(
+                    f"[red]❌ No enabled integrations found. Use --dst-root or configure an integration[/red]"
+                )
                 catalog.close()
                 return
-        
+
         if not dst_root or not dst_root.exists():
             console.print(f"[red]❌ Invalid destination root: {dst_root}[/red]")
             catalog.close()
@@ -1525,15 +1552,20 @@ def select_command(args):
 
         for path_str in selected_paths:
             src = Path(path_str)
-            
+
             # For path length validation, we need to compute the RED path
             from .red_paths import build_dst_paths
+
             _, dst_file = build_dst_paths(src, dst_root)
-            
+
             # Use a reasonable estimate for path length checking
-            estimated_path_len = len(str(dst_root)) + len(str(dst_file)) + 50  # folder name estimate
+            estimated_path_len = (
+                len(str(dst_root)) + len(str(dst_file)) + 50
+            )  # folder name estimate
             if path_limit and estimated_path_len > path_limit:
-                console.print(f"[yellow]⚠️  Skipping {src.name}: Path likely too long[/yellow]")
+                console.print(
+                    f"[yellow]⚠️  Skipping {src.name}: Path likely too long[/yellow]"
+                )
                 stats["skipped"] += 1
                 continue
 
@@ -1728,9 +1760,6 @@ def search_and_link_wizard():
     catalog.close()
 
 
-
-
-
 def summary_table(stats: dict, elapsed: float):
     w = term_width()
     line = "─" * max(4, w - 2)
@@ -1867,7 +1896,7 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
                 dst.unlink()
                 os.link(src, dst)
                 set_file_permissions_and_ownership(dst)
-                
+
                 row("↻", Sty.BLUE, "repl", src, dst, dry_run)
                 stats["replaced"] += 1
             except OSError as e:
@@ -1890,7 +1919,7 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
         try:
             os.link(src, dst)
             set_file_permissions_and_ownership(dst)
-            
+
             row("🔗", Sty.GREEN, "link", src, dst, dry_run)
             stats["linked"] += 1
         except OSError as e:

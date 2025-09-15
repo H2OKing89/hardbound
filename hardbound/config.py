@@ -2,11 +2,11 @@
 Configuration management with validation and migration
 """
 
-import json
 import copy
+import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, cast
-from dataclasses import dataclass
 
 from .utils.validation import PathValidator
 
@@ -14,10 +14,12 @@ CONFIG_DIR = Path.home() / ".config" / "hardbound"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 DEFAULT_LOG_DIR = Path("/mnt/cache/scripts/hardbound/logs")
 
+
 @dataclass
 class LoggingConfig:
     """Configuration for structured logging with Rich console and JSON file output"""
-    level: str = "INFO"          # DEBUG, INFO, WARNING, ERROR
+
+    level: str = "INFO"  # DEBUG, INFO, WARNING, ERROR
     file_enabled: bool = True
     console_enabled: bool = True
     json_file: bool = True
@@ -25,7 +27,8 @@ class LoggingConfig:
     rotate_max_bytes: int = 10 * 1024 * 1024  # 10 MiB
     rotate_backups: int = 5
     rich_tracebacks: bool = True
-    show_path: bool = False       # rich console "path=…" decoration
+    show_path: bool = False  # rich console "path=…" decoration
+
 
 # Configuration schema with defaults and validation
 DEFAULT_CONFIG = {
@@ -37,13 +40,13 @@ DEFAULT_CONFIG = {
         "torrent": {
             "path": "",
             "path_limit": None,  # No limit for regular torrents
-            "enabled": True
+            "enabled": True,
         },
         "red": {
             "path": "/mnt/user/data/downloads/torrents/qbittorrent/seedvault/audiobooks/redacted",
             "path_limit": 180,
-            "enabled": False
-        }
+            "enabled": False,
+        },
     },
     "zero_pad": True,
     "also_cover": False,
@@ -73,18 +76,22 @@ DEFAULT_CONFIG = {
         "rotate_max_bytes": 10 * 1024 * 1024,  # 10 MiB
         "rotate_backups": 5,
         "rich_tracebacks": True,
-        "show_path": False
-    }
+        "show_path": False,
+    },
 }
 
 CONFIG_VALIDATORS = {
     "library_path": lambda x: PathValidator.validate_library_path(x) is not None,
     "torrent_path": lambda x: PathValidator.validate_destination_path(x) is not None,
-    "integrations": lambda x: isinstance(x, dict) and all(
-        isinstance(k, str) and isinstance(v, dict) and
-        "path" in v and "path_limit" in v and "enabled" in v and
-        isinstance(v["enabled"], bool) and
-        (v["path_limit"] is None or isinstance(v["path_limit"], int))
+    "integrations": lambda x: isinstance(x, dict)
+    and all(
+        isinstance(k, str)
+        and isinstance(v, dict)
+        and "path" in v
+        and "path_limit" in v
+        and "enabled" in v
+        and isinstance(v["enabled"], bool)
+        and (v["path_limit"] is None or isinstance(v["path_limit"], int))
         for k, v in x.items()
     ),
     "zero_pad": lambda x: isinstance(x, bool),
@@ -224,14 +231,17 @@ class ConfigManager:
         integrations = self.config.get("integrations", {})
         if not isinstance(integrations, dict):
             return {}
-        return {name: config for name, config in integrations.items() 
-                if isinstance(config, dict) and config.get("enabled", False)}
+        return {
+            name: config
+            for name, config in integrations.items()
+            if isinstance(config, dict) and config.get("enabled", False)
+        }
 
     def set_integration_path(self, name: str, path: str):
         """Set path for a specific integration"""
         if "integrations" not in self.config:
             self.config["integrations"] = copy.deepcopy(DEFAULT_CONFIG["integrations"])
-        
+
         integrations = self.config["integrations"]
         if isinstance(integrations, dict) and name in integrations:
             if isinstance(integrations[name], dict):
@@ -244,7 +254,7 @@ class ConfigManager:
         """Enable or disable an integration"""
         if "integrations" not in self.config:
             self.config["integrations"] = copy.deepcopy(DEFAULT_CONFIG["integrations"])
-            
+
         integrations = self.config["integrations"]
         if isinstance(integrations, dict) and name in integrations:
             if isinstance(integrations[name], dict):
@@ -258,11 +268,11 @@ class ConfigManager:
         integration = self.get_integration(name)
         if not integration:
             return True  # No integration found, no validation needed
-            
+
         path_limit = integration.get("path_limit")
         if path_limit is None:
             return True  # No limit set
-            
+
         return len(path_str) <= path_limit
 
 

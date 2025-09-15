@@ -50,6 +50,7 @@ def ellipsize(s: str, limit: int) -> str:
     # For Rich markup strings, use Rich's built-in truncation
     try:
         from rich.text import Text
+
         text = Text.from_markup(s)
         if len(text.plain) <= limit:
             return s

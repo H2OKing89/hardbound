@@ -53,7 +53,9 @@ class PathValidator:
         return path
 
     @staticmethod
-    def validate_destination_path_with_limit(path_str: str, limit: Optional[int] = None) -> Optional[Path]:
+    def validate_destination_path_with_limit(
+        path_str: str, limit: Optional[int] = None
+    ) -> Optional[Path]:
         """Validate destination path with optional character limit"""
         if not path_str or not path_str.strip():
             return None
