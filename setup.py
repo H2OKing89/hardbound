@@ -9,7 +9,7 @@ setup(
             "hardbound=hardbound:main",
         ],
     },
-    python_requires=">=3.8",
+    python_requires=">=3.13",
     install_requires=[],
     extras_require={
         "progress": ["tqdm"],

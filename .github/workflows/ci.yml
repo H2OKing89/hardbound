@@ -10,16 +10,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        python-version: ['3.13']
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
+        check-latest: true
 
     - name: Install dependencies
       run: |
@@ -32,7 +34,7 @@ jobs:
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v3
-      if: matrix.python-version == '3.11'
+      if: matrix.python-version == '3.13'
       with:
         file: ./coverage.xml
         flags: unittests
@@ -45,9 +47,10 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.13"
+        check-latest: true
 
     - name: Install dependencies
       run: |
@@ -61,11 +64,6 @@ jobs:
         flake8 hardbound tests --count --select=E9,F63,F7,F82 --show-source --statistics
         # exit-zero treats all errors as warnings
         flake8 hardbound tests --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-    - name: Check formatting
-      run: |
-        black --check hardbound tests
-        isort --check-only hardbound tests
 
     - name: Check formatting
       run: |
