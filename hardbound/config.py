@@ -34,6 +34,8 @@ DEFAULT_CONFIG = {
     "also_cover": False,
     "set_permissions": False,
     "file_permissions": 0o644,
+    "set_dir_permissions": False,
+    "dir_permissions": 0o755,
     "set_ownership": False,
     "owner_user": "",
     "owner_group": "",

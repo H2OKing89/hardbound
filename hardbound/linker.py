@@ -27,6 +27,7 @@ def set_file_permissions_and_ownership(file_path: Path):
         if isinstance(file_perms, int):
             try:
                 os.chmod(file_path, file_perms)
+                console.print(f"[dim]  🔒 chmod {oct(file_perms)[-3:]}[/dim]")
             except OSError as e:
                 console.print(f"[yellow]⚠️  Permission setting failed: {e}[/yellow]")
     
@@ -57,8 +58,55 @@ def set_file_permissions_and_ownership(file_path: Path):
                     gid = -1
                     
                 os.chown(file_path, uid, gid)
+                console.print(f"[dim]  👤 chown {owner_user}:{owner_group}[/dim]")
             except (OSError, KeyError, ValueError) as e:
                 console.print(f"[yellow]⚠️  Ownership setting failed: {e}[/yellow]")
+
+
+def set_dir_permissions_and_ownership(dir_path: Path):
+    """Set directory permissions and ownership based on configuration"""
+    config_manager = ConfigManager()
+    config = config_manager.load_config()
+    
+    if config.get("set_dir_permissions", False):
+        dir_perms = config.get("dir_permissions", 0o755)
+        if isinstance(dir_perms, int):
+            try:
+                os.chmod(dir_path, dir_perms)
+                console.print(f"[dim]  📁 chmod {oct(dir_perms)[-3:]} (dir)[/dim]")
+            except OSError as e:
+                console.print(f"[yellow]⚠️  Directory permission setting failed: {e}[/yellow]")
+    
+    if config.get("set_ownership", False):
+        owner_user = config.get("owner_user", "")
+        owner_group = config.get("owner_group", "")
+        if (isinstance(owner_user, str) and owner_user) or (isinstance(owner_group, str) and owner_group):
+            try:
+                import pwd
+                import grp
+                
+                # Handle numeric user ID or username
+                if isinstance(owner_user, str) and owner_user:
+                    if owner_user.isdigit():
+                        uid = int(owner_user)
+                    else:
+                        uid = pwd.getpwnam(owner_user).pw_uid
+                else:
+                    uid = -1
+                
+                # Handle numeric group ID or groupname  
+                if isinstance(owner_group, str) and owner_group:
+                    if owner_group.isdigit():
+                        gid = int(owner_group)
+                    else:
+                        gid = grp.getgrnam(owner_group).gr_gid
+                else:
+                    gid = -1
+                    
+                os.chown(dir_path, uid, gid)
+                console.print(f"[dim]  👤 chown {owner_user}:{owner_group} (dir)[/dim]")
+            except (OSError, KeyError, ValueError) as e:
+                console.print(f"[yellow]⚠️  Directory ownership setting failed: {e}[/yellow]")
 
 
 # Exclusions
@@ -98,11 +146,12 @@ def normalize_weird_ext(src_name: str) -> str:
 
 def clean_base_name(name: str) -> str:
     """Remove user tags from base name for cleaner destination names"""
-    # Remove common user tags like [H2OKing], [UserName], etc.
-    # Pattern: [anything] at the end of the name
+    # Remove common user tags like [H2OKing], [UserName], {ASIN.B09CVBWLZT}, etc.
+    # Pattern: consecutive [anything] or {anything} at the end of the name
     import re
 
-    cleaned = re.sub(r"\s*\[[^\]]+\]\s*$", "", name)
+    # Remove all bracket and curly brace tags at the end (handles multiple consecutive tags)
+    cleaned = re.sub(r"(\s*[\[\{][^\]\}]+[\]\}]\s*)+$", "", name)
     return cleaned.strip()
 
 
@@ -134,6 +183,8 @@ def ensure_dir(p: Path, dry_run: bool, stats: dict):
     else:
         p.mkdir(parents=True, exist_ok=True)
         row("📁", Sty.BLUE, "mkdir", Path("—"), p, dry_run)
+        # Apply directory permissions and ownership
+        set_dir_permissions_and_ownership(p)
 
 
 def choose_base_outputs(dest_dir: Path, base_name: str):

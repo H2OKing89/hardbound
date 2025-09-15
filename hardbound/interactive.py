@@ -17,7 +17,7 @@ from rich.console import Console
 from .catalog import DB_FILE, AudiobookCatalog
 from .config import load_config, save_config, ConfigManager, DEFAULT_CONFIG
 from .display import Sty, summary_table
-from .linker import plan_and_link, zero_pad_vol
+from .linker import plan_and_link, zero_pad_vol, clean_base_name
 from .ui.feedback import ErrorHandler, ProgressIndicator, VisualFeedback
 from .ui.menu import create_main_menu, create_quick_actions_menu, menu_system
 from .utils.validation import InputValidator, PathValidator
@@ -1176,6 +1176,75 @@ They're represented as 3-digit octal numbers (e.g., 644, 755).
         console.print(f"[yellow]❌ File permission setting disabled[/yellow]")
 
 
+def configure_dir_permissions_wizard(config):
+    """Configure directory permissions with helpful defaults and explanations"""
+    console.print(f"\n[cyan]📁 DIRECTORY PERMISSIONS SETUP[/cyan]")
+    console.print(f"""
+[yellow]About directory permissions:[/yellow]
+Directory permissions control who can access and list directory contents. 
+They're represented as 3-digit octal numbers (e.g., 755, 775).
+
+[dim]Common permission values for directories:[/dim]
+  • 755 (rwxr-xr-x) - Owner can read/write/access, others can read/access [green](recommended)[/green]
+  • 775 (rwxrwxr-x) - Owner and group can read/write/access, others can read/access
+  • 700 (rwx------) - Only owner can read/write/access [green](more secure)[/green]
+  • 644 (rw-r--r--) - Not recommended for directories (no execute permission)
+
+[yellow]Note:[/yellow] Directory execute permission (x) allows entering the directory.
+""")
+    
+    current_enabled = config.get('set_dir_permissions', False)
+    current_perms = config.get('dir_permissions', 0o755)
+    
+    if current_enabled:
+        console.print(f"[yellow]Current setting: ✅ Enabled - {oct(current_perms)} ({oct(current_perms)[-3:]})[/yellow]")
+    else:
+        console.print(f"[yellow]Current setting: ❌ Disabled[/yellow]")
+    
+    # Enable/disable
+    enable_choice = input("\nEnable automatic directory permission setting? [y/N]: ").strip().lower()
+    
+    if enable_choice in ['y', 'yes']:
+        config['set_dir_permissions'] = True
+        
+        console.print(f"\n[green]Choose permission mode:[/green]")
+        console.print(f"  1) 755 (rwxr-xr-x) - Standard directory permissions [green](recommended)[/green]")  
+        console.print(f"  2) 775 (rwxrwxr-x) - Group write access")
+        console.print(f"  3) 700 (rwx------) - Owner-only access (secure)")
+        console.print(f"  4) Custom (enter octal number)")
+        
+        perm_choice = input("\nSelect permission mode (1-4): ").strip()
+        
+        if perm_choice == "1":
+            config['dir_permissions'] = 0o755
+            console.print(f"[green]✅ Set to 755 (rwxr-xr-x) - Standard directory permissions[/green]")
+        elif perm_choice == "2":
+            config['dir_permissions'] = 0o775  
+            console.print(f"[green]✅ Set to 775 (rwxrwxr-x) - Group write access[/green]")
+        elif perm_choice == "3":
+            config['dir_permissions'] = 0o700
+            console.print(f"[green]✅ Set to 700 (rwx------) - Owner-only access[/green]")
+        elif perm_choice == "4":
+            custom_perm = input("Enter octal permission (e.g. 755): ").strip()
+            try:
+                if custom_perm.startswith('0o'):
+                    perm_value = int(custom_perm, 8)
+                else:
+                    perm_value = int(custom_perm, 8)
+                if 0 <= perm_value <= 0o777:
+                    config['dir_permissions'] = perm_value
+                    console.print(f"[green]✅ Set to {oct(perm_value)} ({oct(perm_value)[-3:]})[/green]")
+                else:
+                    console.print(f"[red]Invalid permission value. Keeping current setting.[/red]")
+            except ValueError:
+                console.print(f"[red]Invalid octal number. Keeping current setting.[/red]")
+        else:
+            console.print(f"[yellow]Invalid choice. Keeping current permission.[/yellow]")
+    else:
+        config['set_dir_permissions'] = False
+        console.print(f"[yellow]❌ Directory permission setting disabled[/yellow]")
+
+
 def configure_ownership_wizard(config):
     """Configure file ownership with helpful defaults and explanations"""
     console.print(f"\n[cyan]👤 FILE OWNERSHIP SETUP[/cyan]")
@@ -1278,13 +1347,21 @@ def settings_menu():
         
         integration_display = "\n".join(integration_info) if integration_info else "    None configured"
         
-        # Display permission/ownership settings
-        perm_enabled = config.get('set_permissions', False)
-        perm_value = config.get('file_permissions', 0o644)
-        if isinstance(perm_value, int):
-            perm_display = f"✅ {oct(perm_value)} ({oct(perm_value)[-3:]})" if perm_enabled else "❌ Disabled"
+        # Display permission/ownership settings for files
+        file_perm_enabled = config.get('set_permissions', False)
+        file_perm_value = config.get('file_permissions', 0o644)
+        if isinstance(file_perm_value, int):
+            file_perm_display = f"✅ {oct(file_perm_value)} ({oct(file_perm_value)[-3:]})" if file_perm_enabled else "❌ Disabled"
         else:
-            perm_display = "❌ Disabled"
+            file_perm_display = "❌ Disabled"
+        
+        # Display permission/ownership settings for directories
+        dir_perm_enabled = config.get('set_dir_permissions', False)
+        dir_perm_value = config.get('dir_permissions', 0o755)
+        if isinstance(dir_perm_value, int):
+            dir_perm_display = f"✅ {oct(dir_perm_value)} ({oct(dir_perm_value)[-3:]})" if dir_perm_enabled else "❌ Disabled"
+        else:
+            dir_perm_display = "❌ Disabled"
         
         owner_enabled = config.get('set_ownership', False)
         owner_user = config.get('owner_user', '')
@@ -1303,8 +1380,9 @@ def settings_menu():
 {integration_display}
   Zero pad: {config.get('zero_pad', True)}
   Also cover: {config.get('also_cover', False)}
-  File permissions: {perm_display}
-  File ownership: {owner_display}
+  File permissions: {file_perm_display}
+  Directory permissions: {dir_perm_display}
+  Ownership: {owner_display}
   Recent sources: {', '.join(_get_recent_sources(config)[:5])}
 
 [green]Options:[/green]
@@ -1314,14 +1392,15 @@ def settings_menu():
   4) Toggle zero padding
   5) Toggle cover linking
   6) Configure file permissions
-  7) Configure file ownership
-  8) Add recent source
-  9) Remove recent source
- 10) Reset settings to default
- 11) Back to main menu
+  7) Configure directory permissions
+  8) Configure ownership
+  9) Add recent source
+ 10) Remove recent source
+ 11) Reset settings to default
+ 12) Back to main menu
 """
         )
-        choice = input("Select an option (1-11): ").strip()
+        choice = input("Select an option (1-12): ").strip()
 
         if choice == "1":
             new_path = input("Enter new library path: ").strip()
@@ -1349,8 +1428,10 @@ def settings_menu():
         elif choice == "6":
             configure_permissions_wizard(config)
         elif choice == "7":
-            configure_ownership_wizard(config)
+            configure_dir_permissions_wizard(config)
         elif choice == "8":
+            configure_ownership_wizard(config)
+        elif choice == "9":
             source = input("Enter source path to add: ").strip()
             recent_sources = config.get("recent_sources", [])
             if not isinstance(recent_sources, list):
@@ -1359,7 +1440,7 @@ def settings_menu():
                 recent_sources.append(source)
                 config["recent_sources"] = recent_sources
                 console.print(f"[green]Source added to recent sources.[/green]")
-        elif choice == "9":
+        elif choice == "10":
             source = input("Enter source path to remove: ").strip()
             recent_sources = config.get("recent_sources", [])
             if not isinstance(recent_sources, list):
@@ -1368,7 +1449,7 @@ def settings_menu():
                 recent_sources.remove(source)
                 config["recent_sources"] = recent_sources
                 console.print(f"[green]Source removed from recent sources.[/green]")
-        elif choice == "10":
+        elif choice == "11":
             # Reset to default settings
             config = {
                 "first_run": True,
@@ -1378,13 +1459,15 @@ def settings_menu():
                 "also_cover": False,
                 "set_permissions": False,
                 "file_permissions": 0o644,
+                "set_dir_permissions": False,
+                "dir_permissions": 0o755,
                 "set_ownership": False,
                 "owner_user": "",
                 "owner_group": "",
                 "recent_sources": [],
             }
             console.print(f"[green]Settings reset to default.[/green]")
-        elif choice == "11":
+        elif choice == "12":
             break
         else:
             console.print(f"[red]Invalid choice, please try again.[/red]")
@@ -1516,10 +1599,12 @@ def _link_selected_paths(selected_paths: List[str]):
     for path_str in selected_paths:
         src = Path(path_str)
         base_name = zero_pad_vol(src.name) if zero_pad else src.name
-        dst_dir = dst_root / base_name
+        # Clean base name for RED compliance (remove user tags)
+        clean_folder_name = clean_base_name(base_name)
+        dst_dir = dst_root / clean_folder_name
         console.print(f"\n[cyan]Processing: {src.name}[/cyan]")
         plan_and_link(
-            src, dst_dir, base_name, also_cover, zero_pad, False, False, stats
+            src, dst_dir, clean_folder_name, also_cover, zero_pad, False, False, stats
         )
 
     summary_table(stats, perf_counter())

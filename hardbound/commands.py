@@ -26,7 +26,7 @@ except ImportError:
 from rich.console import Console
 
 from .display import Sty, row, banner, section, summary_table
-from .linker import set_file_permissions_and_ownership
+from .linker import set_file_permissions_and_ownership, set_dir_permissions_and_ownership
 
 # Global console instance
 console = Console()
@@ -1538,11 +1538,11 @@ def select_command(args):
 
             if args.dry_run:
                 plan_and_link(
-                    src, dst, base_name, also_cover, zero_pad, False, True, stats
+                    src, dst, clean_folder_name, also_cover, zero_pad, False, True, stats
                 )
             else:
                 plan_and_link(
-                    src, dst, base_name, also_cover, zero_pad, False, False, stats
+                    src, dst, clean_folder_name, also_cover, zero_pad, False, False, stats
                 )
 
         summary_table(stats, perf_counter())
@@ -1772,11 +1772,12 @@ def normalize_weird_ext(src_name: str) -> str:
 
 def clean_base_name(name: str) -> str:
     """Remove user tags from base name for cleaner destination names"""
-    # Remove common user tags like [H2OKing], [UserName], etc.
-    # Pattern: [anything] at the end of the name
+    # Remove common user tags like [H2OKing], [UserName], {ASIN.B09CVBWLZT}, etc.
+    # Pattern: consecutive [anything] or {anything} at the end of the name
     import re
 
-    cleaned = re.sub(r"\s*\[[^\]]+\]\s*$", "", name)
+    # Remove all bracket and curly brace tags at the end (handles multiple consecutive tags)
+    cleaned = re.sub(r"(\s*[\[\{][^\]\}]+[\]\}]\s*)+$", "", name)
     return cleaned.strip()
 
 
@@ -1825,6 +1826,8 @@ def ensure_dir(p: Path, dry_run: bool, stats: dict):
     else:
         p.mkdir(parents=True, exist_ok=True)
         row("📁", Sty.BLUE, "mkdir", Path("—"), p, dry_run)
+        # Apply directory permissions and ownership
+        set_dir_permissions_and_ownership(p)
 
 
 def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
