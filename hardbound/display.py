@@ -22,7 +22,7 @@ class Sty:
     BOLD = "bold"
     DIM = "dim"
     ITAL = "italic"
-    GREY = "grey"
+    GREY = "bright_black"
     RED = "red"
     GREEN = "green"
     YELLOW = "yellow"
@@ -46,12 +46,24 @@ def term_width(default=100):
 
 
 def ellipsize(s: str, limit: int) -> str:
-    if len(s) <= limit:
-        return s
-    if limit <= 10:
-        return s[: max(0, limit - 1)] + "…"
-    keep = (limit - 1) // 2
-    return s[:keep] + "… " + s[-(limit - keep - 2) :]
+    """Ellipsize a string, preserving Rich markup when possible"""
+    # For Rich markup strings, use Rich's built-in truncation
+    try:
+        from rich.text import Text
+        text = Text.from_markup(s)
+        if len(text.plain) <= limit:
+            return s
+        # Use Rich's truncate method which is markup-aware
+        text.truncate(limit - 1, overflow="ellipsis")
+        return text.markup
+    except Exception:
+        # Fallback to simple truncation for non-markup strings
+        if len(s) <= limit:
+            return s
+        if limit <= 10:
+            return s[: max(0, limit - 1)] + "…"
+        keep = (limit - 1) // 2
+        return s[:keep] + "… " + s[-(limit - keep - 2) :]
 
 
 def banner(title: str, mode: str):
@@ -82,7 +94,7 @@ def row(
         Sty.BLUE: "blue",
         Sty.YELLOW: "yellow",
         Sty.RED: "red",
-        Sty.GREY: "grey",
+        Sty.GREY: "bright_black",
         Sty.CYAN: "cyan",
         Sty.MAGENTA: "magenta",
     }
@@ -94,7 +106,7 @@ def row(
         rich_color = status_color
 
     left = f"{status_icon} [{rich_color}]{kind:<6}[/{rich_color}]"
-    middle = f"[grey]{src}[/grey] [dim]→[/dim] {dst}"
+    middle = f"[bright_black]{src}[/bright_black] [dim]→[/dim] {dst}"
 
     console.print(f"{left}  {ellipsize(middle, term_width() - 20)}")
 
@@ -112,10 +124,10 @@ def summary_table(stats: dict, elapsed: float):
 
     table.add_row("linked", str(stats["linked"]), style="green")
     table.add_row("replaced", str(stats["replaced"]), style="blue")
-    table.add_row("already", str(stats["already"]), style="grey")
+    table.add_row("already", str(stats["already"]), style="bright_black")
     table.add_row("exists", str(stats["exists"]), style="yellow")
-    table.add_row("excluded", str(stats["excluded"]), style="grey")
-    table.add_row("skipped", str(stats["skipped"]), style="grey")
+    table.add_row("excluded", str(stats["excluded"]), style="bright_black")
+    table.add_row("skipped", str(stats["skipped"]), style="bright_black")
     table.add_row("errors", str(stats["errors"]), style="red")
 
     console.print(table)

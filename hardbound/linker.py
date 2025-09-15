@@ -10,10 +10,56 @@ from typing import Dict, Optional
 
 from rich.console import Console
 
+from .config import ConfigManager
 from .display import Sty, row
 
 # Global console instance
 console = Console()
+
+
+def set_file_permissions_and_ownership(file_path: Path):
+    """Set file permissions and ownership based on configuration"""
+    config_manager = ConfigManager()
+    config = config_manager.load_config()
+    
+    if config.get("set_permissions", False):
+        file_perms = config.get("file_permissions", 0o644)
+        if isinstance(file_perms, int):
+            try:
+                os.chmod(file_path, file_perms)
+            except OSError as e:
+                console.print(f"[yellow]⚠️  Permission setting failed: {e}[/yellow]")
+    
+    if config.get("set_ownership", False):
+        owner_user = config.get("owner_user", "")
+        owner_group = config.get("owner_group", "")
+        if (isinstance(owner_user, str) and owner_user) or (isinstance(owner_group, str) and owner_group):
+            try:
+                import pwd
+                import grp
+                
+                # Handle numeric user ID or username
+                if isinstance(owner_user, str) and owner_user:
+                    if owner_user.isdigit():
+                        uid = int(owner_user)
+                    else:
+                        uid = pwd.getpwnam(owner_user).pw_uid
+                else:
+                    uid = -1
+                
+                # Handle numeric group ID or groupname  
+                if isinstance(owner_group, str) and owner_group:
+                    if owner_group.isdigit():
+                        gid = int(owner_group)
+                    else:
+                        gid = grp.getgrnam(owner_group).gr_gid
+                else:
+                    gid = -1
+                    
+                os.chown(file_path, uid, gid)
+            except (OSError, KeyError, ValueError) as e:
+                console.print(f"[yellow]⚠️  Ownership setting failed: {e}[/yellow]")
+
 
 # Exclusions
 EXCLUDE_DEST_NAMES = {"cover.jpg", "metadata.json"}
@@ -140,6 +186,7 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
             try:
                 dst.unlink()
                 os.link(src, dst)
+                set_file_permissions_and_ownership(dst)
                 row("↻", Sty.BLUE, "repl", src, dst, dry_run)
                 stats["replaced"] += 1
             except OSError as e:
@@ -163,6 +210,7 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
     else:
         try:
             os.link(src, dst)
+            set_file_permissions_and_ownership(dst)
             row("🔗", Sty.GREEN, "link", src, dst, dry_run)
             stats["linked"] += 1
         except OSError as e:

@@ -53,6 +53,33 @@ class PathValidator:
         return path
 
     @staticmethod
+    def validate_destination_path_with_limit(path_str: str, limit: Optional[int] = None) -> Optional[Path]:
+        """Validate destination path with optional character limit"""
+        if not path_str or not path_str.strip():
+            return None
+
+        path = Path(path_str.strip()).expanduser()
+        path_str = str(path)
+
+        # Check path length limit
+        if limit is not None and len(path_str) > limit:
+            console.print(
+                f"[yellow]⚠️  Path too long: {len(path_str)} characters (limit: {limit})[/yellow]"
+            )
+            console.print(f"[cyan]💡 Tip: Use a shorter path or abbreviations[/cyan]")
+            return None
+
+        # Check if parent exists
+        if not path.parent.exists():
+            console.print(
+                f"[yellow]⚠️  Parent directory does not exist: {path.parent}[/yellow]"
+            )
+            console.print(f"[cyan]💡 Tip: Create the parent directory first[/cyan]")
+            return None
+
+        return path
+
+    @staticmethod
     def get_default_search_paths() -> List[Path]:
         """Get sensible default search paths"""
         defaults = []

@@ -3,6 +3,7 @@ Configuration management with validation and migration
 """
 
 import json
+import copy
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -13,12 +14,29 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 # Configuration schema with defaults and validation
 DEFAULT_CONFIG = {
-    "version": "1.0",
+    "version": "1.1",
     "first_run": True,
     "library_path": "",
     "torrent_path": "",
+    "integrations": {
+        "torrent": {
+            "path": "",
+            "path_limit": None,  # No limit for regular torrents
+            "enabled": True
+        },
+        "red": {
+            "path": "/mnt/user/data/downloads/torrents/qbittorrent/seedvault/audiobooks/redacted",
+            "path_limit": 180,
+            "enabled": False
+        }
+    },
     "zero_pad": True,
     "also_cover": False,
+    "set_permissions": False,
+    "file_permissions": 0o644,
+    "set_ownership": False,
+    "owner_user": "",
+    "owner_group": "",
     "recent_sources": [],
     "system_search_paths": [
         "/mnt/user/data/audio/audiobooks",
@@ -34,8 +52,20 @@ DEFAULT_CONFIG = {
 CONFIG_VALIDATORS = {
     "library_path": lambda x: PathValidator.validate_library_path(x) is not None,
     "torrent_path": lambda x: PathValidator.validate_destination_path(x) is not None,
+    "integrations": lambda x: isinstance(x, dict) and all(
+        isinstance(k, str) and isinstance(v, dict) and
+        "path" in v and "path_limit" in v and "enabled" in v and
+        isinstance(v["enabled"], bool) and
+        (v["path_limit"] is None or isinstance(v["path_limit"], int))
+        for k, v in x.items()
+    ),
     "zero_pad": lambda x: isinstance(x, bool),
     "also_cover": lambda x: isinstance(x, bool),
+    "set_permissions": lambda x: isinstance(x, bool),
+    "file_permissions": lambda x: isinstance(x, int) and 0 <= x <= 0o777,
+    "set_ownership": lambda x: isinstance(x, bool),
+    "owner_user": lambda x: isinstance(x, str),
+    "owner_group": lambda x: isinstance(x, str),
     "recent_sources": lambda x: isinstance(x, list),
     "system_search_paths": lambda x: isinstance(x, list)
     and all(isinstance(p, str) for p in x),
@@ -84,8 +114,8 @@ class ConfigManager:
         """Migrate configuration from older versions"""
         version = loaded_config.get("version", "0.0")
 
-        # Start with defaults
-        migrated = DEFAULT_CONFIG.copy()
+        # Start with defaults (deep copy to avoid reference issues)
+        migrated = copy.deepcopy(DEFAULT_CONFIG)
 
         # Copy existing valid values
         for key, value in loaded_config.items():
@@ -99,6 +129,14 @@ class ConfigManager:
                 migrated["library_path"] = loaded_config["library"]
             if "torrent" in loaded_config:
                 migrated["torrent_path"] = loaded_config["torrent"]
+
+        # Migrate from version 1.0 to 1.1 - add integrations structure
+        if version in ["0.0", "1.0"]:
+            # Preserve existing torrent_path in new integrations structure
+            torrent_path = loaded_config.get("torrent_path", "")
+            if torrent_path:
+                migrated["integrations"]["torrent"]["path"] = torrent_path
+                migrated["integrations"]["torrent"]["enabled"] = True
 
         migrated["version"] = DEFAULT_CONFIG["version"]
         return migrated
@@ -139,7 +177,58 @@ class ConfigManager:
 
     def reset_to_defaults(self):
         """Reset configuration to defaults"""
-        self.config = DEFAULT_CONFIG.copy()
+        self.config = copy.deepcopy(DEFAULT_CONFIG)
+
+    def get_integration(self, name: str) -> Optional[Dict[str, Any]]:
+        """Get integration configuration by name"""
+        integrations = self.config.get("integrations", {})
+        if isinstance(integrations, dict):
+            return integrations.get(name)
+        return None
+
+    def get_enabled_integrations(self) -> Dict[str, Dict[str, Any]]:
+        """Get all enabled integrations"""
+        integrations = self.config.get("integrations", {})
+        if not isinstance(integrations, dict):
+            return {}
+        return {name: config for name, config in integrations.items() 
+                if isinstance(config, dict) and config.get("enabled", False)}
+
+    def set_integration_path(self, name: str, path: str):
+        """Set path for a specific integration"""
+        if "integrations" not in self.config:
+            self.config["integrations"] = copy.deepcopy(DEFAULT_CONFIG["integrations"])
+        
+        integrations = self.config["integrations"]
+        if isinstance(integrations, dict) and name in integrations:
+            if isinstance(integrations[name], dict):
+                integrations[name]["path"] = path
+        else:
+            raise ValueError(f"Unknown integration: {name}")
+
+    def enable_integration(self, name: str, enabled: bool = True):
+        """Enable or disable an integration"""
+        if "integrations" not in self.config:
+            self.config["integrations"] = copy.deepcopy(DEFAULT_CONFIG["integrations"])
+            
+        integrations = self.config["integrations"]
+        if isinstance(integrations, dict) and name in integrations:
+            if isinstance(integrations[name], dict):
+                integrations[name]["enabled"] = enabled
+        else:
+            raise ValueError(f"Unknown integration: {name}")
+
+    def validate_path_length(self, name: str, path_str: str) -> bool:
+        """Validate path length for a specific integration"""
+        integration = self.get_integration(name)
+        if not integration:
+            return True  # No integration found, no validation needed
+            
+        path_limit = integration.get("path_limit")
+        if path_limit is None:
+            return True  # No limit set
+            
+        return len(path_str) <= path_limit
 
 
 # Global config manager instance

@@ -25,8 +25,55 @@ except ImportError:
 
 from rich.console import Console
 
+from .display import Sty, row, banner, section, summary_table
+from .linker import set_file_permissions_and_ownership
+
 # Global console instance
 console = Console()
+
+
+def parse_selection_input(input_str: str, max_items: int) -> List[int]:
+    """Parse selection input with support for ranges and comma-separated values.
+    
+    Examples:
+    - "1,3,5" -> [0, 2, 4]
+    - "1-5" -> [0, 1, 2, 3, 4]
+    - "1-3,7,9-11" -> [0, 1, 2, 6, 8, 9, 10]
+    
+    Returns 0-based indices.
+    """
+    indices = set()
+    
+    # Split by commas and handle each part
+    for part in input_str.replace(' ', '').split(','):
+        if not part:
+            continue
+            
+        if '-' in part:
+            # Handle range (e.g., "1-5")
+            try:
+                start_str, end_str = part.split('-', 1)
+                start = int(start_str)
+                end = int(end_str)
+                
+                # Convert to 0-based and validate
+                if start >= 1 and end >= 1 and start <= max_items and end <= max_items:
+                    for i in range(min(start, end), max(start, end) + 1):
+                        indices.add(i - 1)  # Convert to 0-based
+            except ValueError:
+                # Skip invalid ranges
+                continue
+        else:
+            # Handle single number
+            try:
+                num = int(part)
+                if 1 <= num <= max_items:
+                    indices.add(num - 1)  # Convert to 0-based
+            except ValueError:
+                # Skip invalid numbers
+                continue
+    
+    return sorted(list(indices))
 
 # -------------------------
 # Exclusions (DESTINATION)
@@ -902,22 +949,26 @@ def hierarchical_browser(catalog: AudiobookCatalog) -> List[str]:
             )
 
     # Selection
-    console.print(
-        f"\n[yellow]Enter numbers (space-separated), 'all', or 'q' to quit:[/yellow]"
-    )
-    choice = input("Selection: ").strip().lower()
+    console.print(f"\n[cyan]🎯 Selection Instructions:[/cyan]")
+    console.print(f"  • Enter numbers separated by commas: [green]1,3,5[/green]")
+    console.print(f"  • Use ranges with dashes: [green]1-5,8,10-12[/green]")
+    console.print(f"  • Enter [green]all[/green] to select everything")
+    console.print(f"  • Press Enter without input to cancel")
+    console.print(f"\n[yellow]Selection (or 'q' to quit):[/yellow]")
+    choice = input("Choice: ").strip().lower()
 
     if choice == "q":
         return []
     elif choice == "all":
         return [book["path"] for book in all_selectable]
+    elif not choice:
+        return []
     else:
         selected = []
-        for num in choice.split():
-            if num.isdigit():
-                idx = int(num) - 1
-                if 0 <= idx < len(all_selectable):
-                    selected.append(all_selectable[idx]["path"])
+        selected_indices = parse_selection_input(choice, len(all_selectable))
+        for idx in selected_indices:
+            if 0 <= idx < len(all_selectable):
+                selected.append(all_selectable[idx]["path"])
         return selected
 
 
@@ -1213,12 +1264,20 @@ def fallback_picker(candidates: List[Dict], multi: bool) -> List[str]:
         print(f"... and {len(candidates) - 30} more")
 
     if multi:
-        choice = input("\nEnter numbers (space-separated) or 'all': ").strip()
+        console.print(f"\n[cyan]🎯 Selection Instructions:[/cyan]")
+        console.print(f"  • Enter numbers separated by commas: [green]1,3,5[/green]")
+        console.print(f"  • Use ranges with dashes: [green]1-5,8,10-12[/green]")
+        console.print(f"  • Enter [green]all[/green] to select everything")
+        console.print(f"  • Press Enter without input to cancel")
+        choice = input("\nSelection: ").strip()
+        
         if choice.lower() == "all":
             return [c["path"] for c in candidates]
+        elif not choice:
+            return []
 
-        indices = [int(x) - 1 for x in choice.split() if x.isdigit()]
-        return [candidates[i]["path"] for i in indices if 0 <= i < len(candidates)]
+        selected_indices = parse_selection_input(choice, len(candidates))
+        return [candidates[i]["path"] for i in selected_indices if 0 <= i < len(candidates)]
     else:
         choice = input("\nEnter number: ").strip()
         if choice.isdigit():
@@ -1387,8 +1446,66 @@ def select_command(args):
         return
 
     # If --link flag is set, proceed to linking
-    if args.link and args.dst_root:
+    if args.link:
         config = load_config()
+        
+        # Handle integration selection
+        dst_root = None
+        path_limit = None
+        
+        if args.integration:
+            # Use specified integration
+            integrations = config.get("integrations", {})
+            if isinstance(integrations, dict) and args.integration in integrations:
+                integration_config = integrations[args.integration]
+                if isinstance(integration_config, dict):
+                    if not integration_config.get("enabled", False):
+                        console.print(f"[red]❌ {args.integration.upper()} integration is disabled[/red]")
+                        catalog.close()
+                        return
+                    dst_root = Path(integration_config.get("path", ""))
+                    path_limit = integration_config.get("path_limit")
+                else:
+                    console.print(f"[red]❌ Invalid configuration for {args.integration.upper()} integration[/red]")
+                    catalog.close()
+                    return
+            else:
+                console.print(f"[red]❌ {args.integration.upper()} integration not found[/red]")
+                catalog.close()
+                return
+        elif args.dst_root:
+            # Use provided dst_root
+            dst_root = args.dst_root
+        else:
+            # Try to auto-select from enabled integrations
+            integrations = config.get("integrations", {})
+            enabled_integrations = []
+            if isinstance(integrations, dict):
+                for name, int_config in integrations.items():
+                    if isinstance(int_config, dict) and int_config.get("enabled", False):
+                        enabled_integrations.append((name, int_config))
+            
+            if len(enabled_integrations) == 1:
+                integration_name, integration_config = enabled_integrations[0]
+                dst_root = Path(integration_config.get("path", ""))
+                path_limit = integration_config.get("path_limit")
+                console.print(f"[cyan]Using {integration_name.upper()} integration: {dst_root}[/cyan]")
+            elif len(enabled_integrations) > 1:
+                console.print(f"[yellow]Multiple integrations available. Use --integration to specify:[/yellow]")
+                for name, int_config in enabled_integrations:
+                    limit_str = f" (limit: {int_config.get('path_limit')} chars)" if int_config.get('path_limit') else ""
+                    console.print(f"  --integration {name}{limit_str}: {int_config.get('path', '')}")
+                catalog.close()
+                return
+            else:
+                console.print(f"[red]❌ No enabled integrations found. Use --dst-root or configure an integration[/red]")
+                catalog.close()
+                return
+        
+        if not dst_root or not dst_root.exists():
+            console.print(f"[red]❌ Invalid destination root: {dst_root}[/red]")
+            catalog.close()
+            return
         stats = {
             "linked": 0,
             "replaced": 0,
@@ -1403,13 +1520,19 @@ def select_command(args):
         also_cover = bool(config.get("also_cover", False))
 
         print(
-            f"\n[cyan]Linking {len(selected_paths)} audiobook(s) to {args.dst_root}[/cyan]"
+            f"\n[cyan]Linking {len(selected_paths)} audiobook(s) to {dst_root}[/cyan]"
         )
 
         for path_str in selected_paths:
             src = Path(path_str)
             base_name = zero_pad_vol(src.name) if zero_pad else src.name
-            dst = args.dst_root / base_name
+            dst = dst_root / base_name
+
+            # Validate path length if limit is set
+            if path_limit and len(str(dst)) > path_limit:
+                console.print(f"[yellow]⚠️  Skipping {src.name}: Path too long ({len(str(dst))} > {path_limit} chars)[/yellow]")
+                stats["skipped"] += 1
+                continue
 
             console.print(f"\n[bold]{src.name}[/bold]")
 
@@ -1602,80 +1725,7 @@ def search_and_link_wizard():
     catalog.close()
 
 
-# ---------- Styling ----------
-class Sty:
-    RESET = "\x1b[0m"
-    BOLD = "\x1b[1m"
-    DIM = "\x1b[2m"
-    ITAL = "\x1b[3m"
-    GREY = "\x1b[90m"
-    RED = "\x1b[31m"
-    GREEN = "\x1b[32m"
-    YELLOW = "\x1b[33m"
-    BLUE = "\x1b[34m"
-    MAGENTA = "\x1b[35m"
-    CYAN = "\x1b[36m"
-    WHITE = "\x1b[37m"
 
-    enabled = True
-
-    @classmethod
-    def off(cls):
-        cls.enabled = False
-        for k, v in cls.__dict__.items():
-            if isinstance(v, str) and v.startswith("\x1b"):
-                setattr(cls, k, "")
-
-
-def term_width(default=100):
-    try:
-        return shutil.get_terminal_size().columns
-    except Exception:
-        return default
-
-
-def ellipsize(s: str, limit: int) -> str:
-    if len(s) <= limit:
-        return s
-    if limit <= 10:
-        return s[: max(0, limit - 1)] + "…"
-    keep = (limit - 1) // 2
-    return s[:keep] + "… " + s[-(limit - keep - 2) :]
-
-
-def banner(title: str, mode: str):
-    w = term_width()
-    line = "─" * max(4, w - 2)
-    label = f"[bold][cyan] {title} [/cyan][/bold]"
-    mode_tag = (
-        f"[yellow][DRY-RUN][/yellow]" if mode == "dry" else f"[green][COMMIT][/green]"
-    )
-    console.print(f"┌{line}┐")
-    console.print(f"│ {label}{mode_tag}".ljust(w - 1) + "│")
-    console.print(f"└{line}┘")
-
-
-def section(title: str):
-    w = term_width()
-    line = "─" * max(4, w - 2)
-    console.print(f"[magenta]{title}[/magenta]")
-    print(line)
-
-
-def row(
-    status_icon: str, status_color: str, kind: str, src: Path, dst: Path, dry: bool
-):
-    w = term_width()
-    left = f"{status_icon} {status_color}{kind:<6}"
-    middle = f"[grey]{src}[/grey] [dim]→[/dim] {dst}"
-    usable = max(20, w - len(strip_ansi(left)) - 6)
-    console.print(f"{left}  {ellipsize(middle, usable)}")
-
-
-def strip_ansi(s: str) -> str:
-    import re
-
-    return re.sub(r"\x1b\[[0-9;]*m", "", s)
 
 
 def summary_table(stats: dict, elapsed: float):
@@ -1689,10 +1739,10 @@ def summary_table(stats: dict, elapsed: float):
     cells = [
         cell("linked", stats["linked"], "[green]"),
         cell("replaced", stats["replaced"], "[blue]"),
-        cell("already", stats["already"], "[grey]"),
+        cell("already", stats["already"], "[bright_black]"),
         cell("exists", stats["exists"], "[yellow]"),
-        cell("excluded", stats["excluded"], "[grey]"),
-        cell("skipped", stats["skipped"], "[grey]"),
+        cell("excluded", stats["excluded"], "[bright_black]"),
+        cell("skipped", stats["skipped"], "[bright_black]"),
         cell("errors", stats["errors"], "[red]"),
     ]
     s = "  |  ".join(cells)
@@ -1810,6 +1860,8 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
             try:
                 dst.unlink()
                 os.link(src, dst)
+                set_file_permissions_and_ownership(dst)
+                
                 row("↻", Sty.BLUE, "repl", src, dst, dry_run)
                 stats["replaced"] += 1
             except OSError as e:
@@ -1831,6 +1883,8 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
     else:
         try:
             os.link(src, dst)
+            set_file_permissions_and_ownership(dst)
+            
             row("🔗", Sty.GREEN, "link", src, dst, dry_run)
             stats["linked"] += 1
         except OSError as e:

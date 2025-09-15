@@ -118,6 +118,7 @@ def main():
     select_parser.add_argument('-m', '--multi', action='store_true', help='Multi-select mode')
     select_parser.add_argument('--link', action='store_true', help='Link selected items')
     select_parser.add_argument('--dst-root', type=Path, help='Destination root for linking')
+    select_parser.add_argument('--integration', choices=['torrent', 'red'], help='Use specific integration for linking')
     select_parser.add_argument('--dry-run', action='store_true', help='Preview only')
     
     # Manage command

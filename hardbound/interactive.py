@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import subprocess
+import copy
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
@@ -14,7 +15,7 @@ from typing import Dict, List, Optional
 from rich.console import Console
 
 from .catalog import DB_FILE, AudiobookCatalog
-from .config import load_config, save_config
+from .config import load_config, save_config, ConfigManager, DEFAULT_CONFIG
 from .display import Sty, summary_table
 from .linker import plan_and_link, zero_pad_vol
 from .ui.feedback import ErrorHandler, ProgressIndicator, VisualFeedback
@@ -28,9 +29,51 @@ console = Console()
 def _get_recent_sources(config):
     """Safely get recent sources as a list"""
     sources = config.get("recent_sources", [])
-    if isinstance(sources, list):
-        return sources
-    return []
+    return sources if isinstance(sources, list) else []
+
+
+def parse_selection_input(input_str: str, max_items: int) -> List[int]:
+    """Parse selection input with support for ranges and comma-separated values.
+    
+    Examples:
+    - "1,3,5" -> [0, 2, 4]
+    - "1-5" -> [0, 1, 2, 3, 4]
+    - "1-3,7,9-11" -> [0, 1, 2, 6, 8, 9, 10]
+    
+    Returns 0-based indices.
+    """
+    indices = set()
+    
+    # Split by commas and handle each part
+    for part in input_str.replace(' ', '').split(','):
+        if not part:
+            continue
+            
+        if '-' in part:
+            # Handle range (e.g., "1-5")
+            try:
+                start_str, end_str = part.split('-', 1)
+                start = int(start_str)
+                end = int(end_str)
+                
+                # Convert to 0-based and validate
+                if start >= 1 and end >= 1 and start <= max_items and end <= max_items:
+                    for i in range(min(start, end), max(start, end) + 1):
+                        indices.add(i - 1)  # Convert to 0-based
+            except ValueError:
+                # Skip invalid ranges
+                continue
+        else:
+            # Handle single number
+            try:
+                num = int(part)
+                if 1 <= num <= max_items:
+                    indices.add(num - 1)  # Convert to 0-based
+            except ValueError:
+                # Skip invalid numbers
+                continue
+    
+    return sorted(list(indices))
 
 
 def have_fzf() -> bool:
@@ -188,22 +231,26 @@ def hierarchical_browser(catalog) -> List[str]:
             )
 
     # Selection
-    console.print(
-        f"\n[yellow]Enter numbers (space-separated), 'all', or 'q' to quit:[/yellow]"
-    )
-    choice = input("Selection: ").strip().lower()
+    console.print(f"\n[cyan]🎯 Selection Instructions:[/cyan]")
+    console.print(f"  • Enter numbers separated by commas: [green]1,3,5[/green]")
+    console.print(f"  • Use ranges with dashes: [green]1-5,8,10-12[/green]")
+    console.print(f"  • Enter [green]all[/green] to select everything")
+    console.print(f"  • Press Enter without input to cancel")
+    console.print(f"\n[yellow]Selection (or 'q' to quit):[/yellow]")
+    choice = input("Choice: ").strip().lower()
 
     if choice == "q":
         return []
     elif choice == "all":
         return [book["path"] for book in all_selectable]
+    elif not choice:
+        return []
     else:
         selected = []
-        for num in choice.split():
-            if num.isdigit():
-                idx = int(num) - 1
-                if 0 <= idx < len(all_selectable):
-                    selected.append(all_selectable[idx]["path"])
+        selected_indices = parse_selection_input(choice, len(all_selectable))
+        for idx in selected_indices:
+            if 0 <= idx < len(all_selectable):
+                selected.append(all_selectable[idx]["path"])
         return selected
 
 
@@ -522,12 +569,20 @@ def fallback_picker(candidates: List[Dict], multi: bool) -> List[str]:
         print(f"... and {len(candidates) - 30} more")
 
     if multi:
-        choice = input("\nEnter numbers (space-separated) or 'all': ").strip()
+        console.print(f"\n[cyan]🎯 Selection Instructions:[/cyan]")
+        console.print(f"  • Enter numbers separated by commas: [green]1,3,5[/green]")
+        console.print(f"  • Use ranges with dashes: [green]1-5,8,10-12[/green]")
+        console.print(f"  • Enter [green]all[/green] to select everything")
+        console.print(f"  • Press Enter without input to cancel")
+        choice = input("\nSelection: ").strip()
+        
         if choice.lower() == "all":
             return [c["path"] for c in candidates]
+        elif not choice:
+            return []
 
-        indices = [int(x) - 1 for x in choice.split() if x.isdigit()]
-        return [candidates[i]["path"] for i in indices if 0 <= i < len(candidates)]
+        selected_indices = parse_selection_input(choice, len(candidates))
+        return [candidates[i]["path"] for i in selected_indices if 0 <= i < len(candidates)]
     else:
         choice = input("\nEnter number: ").strip()
         if choice.isdigit():
@@ -692,11 +747,49 @@ def search_and_link_wizard():
         catalog.close()
         return
 
-    # Get destination
+    # Get destination - now with integration support
     config = load_config()
-    default_dst = config.get("torrent_path", "")
+    config_manager = ConfigManager()
+    config_manager.config = config
+    
+    # Get available integrations
+    enabled_integrations = config_manager.get_enabled_integrations()
+    
+    if not enabled_integrations:
+        console.print(f"[yellow]⚠️  No integrations are enabled. Please configure at least one integration.[/yellow]")
+        catalog.close()
+        return
+    
+    # Select integration if multiple are available
+    selected_integration = None
+    if len(enabled_integrations) == 1:
+        selected_integration = list(enabled_integrations.keys())[0]
+        console.print(f"[cyan]Using {selected_integration} integration[/cyan]")
+    else:
+        console.print(f"\n[bold]Select integration:[/bold]")
+        for i, (name, config_data) in enumerate(enabled_integrations.items(), 1):
+            path_limit = config_data.get("path_limit")
+            limit_str = f" (limit: {path_limit} chars)" if path_limit else ""
+            console.print(f"  [green]{i}[/green]) {name.upper()}{limit_str}: {config_data.get('path', '')}")
+        
+        choice = input(f"\nChoice (1-{len(enabled_integrations)}): ").strip()
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(enabled_integrations):
+                selected_integration = list(enabled_integrations.keys())[idx]
+            else:
+                console.print(f"[red]Invalid choice[/red]")
+                catalog.close()
+                return
+        except ValueError:
+            console.print(f"[red]Invalid choice[/red]")
+            catalog.close()
+            return
 
-    console.print(f"\n[bold]Destination root:[/bold]")
+    integration_config = enabled_integrations[selected_integration]
+    default_dst = integration_config.get("path", "")
+
+    console.print(f"\n[bold]Destination root ({selected_integration.upper()}):[/bold]")
     if default_dst:
         print(f"Default: {default_dst}")
         dst_input = input("Path (Enter for default): ").strip()
@@ -707,6 +800,14 @@ def search_and_link_wizard():
             catalog.close()
             return
         dst_root = Path(dst_input)
+
+    # Validate path length for the selected integration
+    path_limit = integration_config.get("path_limit")
+    if path_limit and len(str(dst_root)) > path_limit:
+        console.print(f"[red]⚠️  Path too long: {len(str(dst_root))} characters (limit: {path_limit})[/red]")
+        console.print(f"[cyan]💡 Tip: Use a shorter path for {selected_integration.upper()} integration[/cyan]")
+        catalog.close()
+        return
 
     # Preview and confirm
     console.print(
@@ -1004,6 +1105,155 @@ def maintenance_menu():
         input()
 
 
+def configure_permissions_wizard(config):
+    """Configure file permissions with helpful defaults and explanations"""
+    console.print(f"\n[cyan]📋 FILE PERMISSIONS SETUP[/cyan]")
+    console.print(f"""
+[yellow]About file permissions:[/yellow]
+File permissions control who can read, write, and execute files. 
+They're represented as 3-digit octal numbers (e.g., 644, 755).
+
+[dim]Common permission values:[/dim]
+  • 644 (rw-r--r--) - Owner can read/write, others can read [green](recommended for most files)[/green]
+  • 666 (rw-rw-rw-) - Everyone can read/write
+  • 755 (rwxr-xr-x) - Owner can read/write/execute, others can read/execute
+  • 600 (rw-------) - Only owner can read/write [green](more secure)[/green]
+""")
+    
+    current_enabled = config.get('set_permissions', False)
+    current_perms = config.get('file_permissions', 0o644)
+    
+    if current_enabled:
+        console.print(f"[yellow]Current setting: ✅ Enabled - {oct(current_perms)} ({oct(current_perms)[-3:]})[/yellow]")
+    else:
+        console.print(f"[yellow]Current setting: ❌ Disabled[/yellow]")
+    
+    # Enable/disable
+    enable_choice = input("\nEnable automatic permission setting? [y/N]: ").strip().lower()
+    
+    if enable_choice in ['y', 'yes']:
+        config['set_permissions'] = True
+        
+        console.print(f"\n[green]Choose permission mode:[/green]")
+        console.print(f"  1) 644 (rw-r--r--) - Standard file permissions [green](recommended)[/green]")  
+        console.print(f"  2) 666 (rw-rw-rw-) - Everyone can read/write")
+        console.print(f"  3) 755 (rwxr-xr-x) - Executable files")
+        console.print(f"  4) 600 (rw-------) - Owner-only access (secure)")
+        console.print(f"  5) Custom (enter octal number)")
+        
+        perm_choice = input("\nSelect permission mode (1-5): ").strip()
+        
+        if perm_choice == "1":
+            config['file_permissions'] = 0o644
+            console.print(f"[green]✅ Set to 644 (rw-r--r--) - Standard file permissions[/green]")
+        elif perm_choice == "2":
+            config['file_permissions'] = 0o666  
+            console.print(f"[green]✅ Set to 666 (rw-rw-rw-) - Everyone can read/write[/green]")
+        elif perm_choice == "3":
+            config['file_permissions'] = 0o755
+            console.print(f"[green]✅ Set to 755 (rwxr-xr-x) - Executable files[/green]")
+        elif perm_choice == "4":
+            config['file_permissions'] = 0o600
+            console.print(f"[green]✅ Set to 600 (rw-------) - Owner-only access[/green]")
+        elif perm_choice == "5":
+            custom_perm = input("Enter octal permission (e.g. 644): ").strip()
+            try:
+                if custom_perm.startswith('0o'):
+                    perm_value = int(custom_perm, 8)
+                else:
+                    perm_value = int(custom_perm, 8)
+                if 0 <= perm_value <= 0o777:
+                    config['file_permissions'] = perm_value
+                    console.print(f"[green]✅ Set to {oct(perm_value)} ({oct(perm_value)[-3:]})[/green]")
+                else:
+                    console.print(f"[red]Invalid permission value. Keeping current setting.[/red]")
+            except ValueError:
+                console.print(f"[red]Invalid octal number. Keeping current setting.[/red]")
+        else:
+            console.print(f"[yellow]Invalid choice. Keeping current permission.[/yellow]")
+    else:
+        config['set_permissions'] = False
+        console.print(f"[yellow]❌ File permission setting disabled[/yellow]")
+
+
+def configure_ownership_wizard(config):
+    """Configure file ownership with helpful defaults and explanations"""
+    console.print(f"\n[cyan]👤 FILE OWNERSHIP SETUP[/cyan]")
+    console.print(f"""
+[yellow]About file ownership:[/yellow]
+File ownership determines which user and group own the files.
+You can use either numeric IDs or names.
+
+[dim]Common examples:[/dim]
+  • Numeric: User 99, Group 100 (like 'chown 99:100')
+  • Names: User 'nobody', Group 'users' (like 'chown nobody:users')
+  • Docker: User 1000, Group 1000 (common Docker user)
+  • Plex: User 'plex', Group 'plex'
+
+[yellow]⚠️  Note:[/yellow] Changing ownership typically requires root/sudo privileges.
+""")
+    
+    current_enabled = config.get('set_ownership', False)
+    current_user = config.get('owner_user', '')
+    current_group = config.get('owner_group', '')
+    
+    if current_enabled and (current_user or current_group):
+        console.print(f"[yellow]Current setting: ✅ Enabled - {current_user}:{current_group}[/yellow]")
+    else:
+        console.print(f"[yellow]Current setting: ❌ Disabled[/yellow]")
+    
+    # Enable/disable
+    enable_choice = input("\nEnable automatic ownership setting? [y/N]: ").strip().lower()
+    
+    if enable_choice in ['y', 'yes']:
+        config['set_ownership'] = True
+        
+        console.print(f"\n[green]Choose ownership setup:[/green]")
+        console.print(f"  1) Docker user (1000:1000) [green](common Docker setup)[/green]")
+        console.print(f"  2) Nobody user (99:100) [green](common for services)[/green]")
+        console.print(f"  3) Plex user (plex:plex)")
+        console.print(f"  4) Custom numeric IDs")
+        console.print(f"  5) Custom usernames")
+        
+        owner_choice = input("\nSelect ownership setup (1-5): ").strip()
+        
+        if owner_choice == "1":
+            config['owner_user'] = "1000"
+            config['owner_group'] = "1000"
+            console.print(f"[green]✅ Set to 1000:1000 (Docker user)[/green]")
+        elif owner_choice == "2":
+            config['owner_user'] = "99"
+            config['owner_group'] = "100"
+            console.print(f"[green]✅ Set to 99:100 (nobody:users)[/green]")
+        elif owner_choice == "3":
+            config['owner_user'] = "plex"
+            config['owner_group'] = "plex"
+            console.print(f"[green]✅ Set to plex:plex[/green]")
+        elif owner_choice == "4":
+            user_id = input("Enter numeric user ID (e.g. 99): ").strip()
+            group_id = input("Enter numeric group ID (e.g. 100): ").strip()
+            if user_id.isdigit() and group_id.isdigit():
+                config['owner_user'] = user_id
+                config['owner_group'] = group_id
+                console.print(f"[green]✅ Set to {user_id}:{group_id}[/green]")
+            else:
+                console.print(f"[red]Invalid numeric IDs. Keeping current setting.[/red]")
+        elif owner_choice == "5":
+            username = input("Enter username (e.g. nobody): ").strip()
+            groupname = input("Enter group name (e.g. users): ").strip()
+            if username and groupname:
+                config['owner_user'] = username
+                config['owner_group'] = groupname
+                console.print(f"[green]✅ Set to {username}:{groupname}[/green]")
+            else:
+                console.print(f"[red]Username and group name cannot be empty. Keeping current setting.[/red]")
+        else:
+            console.print(f"[yellow]Invalid choice. Keeping current ownership.[/yellow]")
+    else:
+        config['set_ownership'] = False
+        console.print(f"[yellow]❌ File ownership setting disabled[/yellow]")
+
+
 def settings_menu():
     """Settings and preferences menu"""
     config = load_config()
@@ -1011,27 +1261,67 @@ def settings_menu():
     console.print(f"\n[cyan]⚙️ SETTINGS MENU[/cyan]")
 
     while True:
+        config_manager = ConfigManager()
+        config_manager.config = config
+        
+        # Display integrations info
+        integrations = config_manager.get("integrations", {})
+        integration_info = []
+        if isinstance(integrations, dict):
+            for name, int_config in integrations.items():
+                if isinstance(int_config, dict):
+                    enabled = "✅" if int_config.get("enabled", False) else "❌"
+                    path = int_config.get("path", "Not set")
+                    limit = int_config.get("path_limit")
+                    limit_str = f" (limit: {limit})" if limit else ""
+                    integration_info.append(f"    {name.upper()}: {enabled} {path}{limit_str}")
+        
+        integration_display = "\n".join(integration_info) if integration_info else "    None configured"
+        
+        # Display permission/ownership settings
+        perm_enabled = config.get('set_permissions', False)
+        perm_value = config.get('file_permissions', 0o644)
+        if isinstance(perm_value, int):
+            perm_display = f"✅ {oct(perm_value)} ({oct(perm_value)[-3:]})" if perm_enabled else "❌ Disabled"
+        else:
+            perm_display = "❌ Disabled"
+        
+        owner_enabled = config.get('set_ownership', False)
+        owner_user = config.get('owner_user', '')
+        owner_group = config.get('owner_group', '')
+        if isinstance(owner_user, str) and isinstance(owner_group, str):
+            owner_display = f"✅ {owner_user}:{owner_group}" if owner_enabled else "❌ Disabled"
+        else:
+            owner_display = "❌ Disabled"
+        
         console.print(
             f"""
 [yellow]Current settings:[/yellow]
   Library path: {config.get('library_path', '')}
-  Torrent path: {config.get('torrent_path', '')}
+  Legacy torrent path: {config.get('torrent_path', '')}
+  Integrations:
+{integration_display}
   Zero pad: {config.get('zero_pad', True)}
   Also cover: {config.get('also_cover', False)}
+  File permissions: {perm_display}
+  File ownership: {owner_display}
   Recent sources: {', '.join(_get_recent_sources(config)[:5])}
 
 [green]Options:[/green]
   1) Change library path
-  2) Change torrent path
-  3) Toggle zero padding
-  4) Toggle cover linking
-  5) Add recent source
-  6) Remove recent source
-  7) Reset settings to default
-  8) Back to main menu
+  2) Change legacy torrent path
+  3) Configure integrations
+  4) Toggle zero padding
+  5) Toggle cover linking
+  6) Configure file permissions
+  7) Configure file ownership
+  8) Add recent source
+  9) Remove recent source
+ 10) Reset settings to default
+ 11) Back to main menu
 """
         )
-        choice = input("Select an option (1-8): ").strip()
+        choice = input("Select an option (1-11): ").strip()
 
         if choice == "1":
             new_path = input("Enter new library path: ").strip()
@@ -1044,16 +1334,23 @@ def settings_menu():
                 config["torrent_path"] = new_path
                 console.print(f"[green]Torrent path updated.[/green]")
         elif choice == "3":
+            configure_integrations_wizard(config_manager)
+            config = config_manager.config  # Update config after changes
+        elif choice == "4":
             config["zero_pad"] = not config.get("zero_pad", True)
             console.print(
                 f"[green]Zero padding {'enabled' if config['zero_pad'] else 'disabled'}.[/green]"
             )
-        elif choice == "4":
+        elif choice == "5":
             config["also_cover"] = not config.get("also_cover", False)
             console.print(
                 f"[green]Cover linking {'enabled' if config['also_cover'] else 'disabled'}.[/green]"
             )
-        elif choice == "5":
+        elif choice == "6":
+            configure_permissions_wizard(config)
+        elif choice == "7":
+            configure_ownership_wizard(config)
+        elif choice == "8":
             source = input("Enter source path to add: ").strip()
             recent_sources = config.get("recent_sources", [])
             if not isinstance(recent_sources, list):
@@ -1062,7 +1359,7 @@ def settings_menu():
                 recent_sources.append(source)
                 config["recent_sources"] = recent_sources
                 console.print(f"[green]Source added to recent sources.[/green]")
-        elif choice == "6":
+        elif choice == "9":
             source = input("Enter source path to remove: ").strip()
             recent_sources = config.get("recent_sources", [])
             if not isinstance(recent_sources, list):
@@ -1071,7 +1368,7 @@ def settings_menu():
                 recent_sources.remove(source)
                 config["recent_sources"] = recent_sources
                 console.print(f"[green]Source removed from recent sources.[/green]")
-        elif choice == "7":
+        elif choice == "10":
             # Reset to default settings
             config = {
                 "first_run": True,
@@ -1079,10 +1376,15 @@ def settings_menu():
                 "torrent_path": "",
                 "zero_pad": True,
                 "also_cover": False,
+                "set_permissions": False,
+                "file_permissions": 0o644,
+                "set_ownership": False,
+                "owner_user": "",
+                "owner_group": "",
                 "recent_sources": [],
             }
             console.print(f"[green]Settings reset to default.[/green]")
-        elif choice == "8":
+        elif choice == "11":
             break
         else:
             console.print(f"[red]Invalid choice, please try again.[/red]")
@@ -1266,3 +1568,107 @@ def browse_directory_tree():
                 _, new_path = items[idx]
                 if new_path.is_dir():
                     current = new_path
+
+
+def configure_integrations_wizard(config_manager: ConfigManager):
+    """Configure integration settings"""
+    console.print(f"\n[cyan]🔧 INTEGRATION CONFIGURATION[/cyan]")
+    
+    while True:
+        integrations = config_manager.get("integrations", {})
+        if not isinstance(integrations, dict):
+            integrations = copy.deepcopy(DEFAULT_CONFIG["integrations"])
+            config_manager.config["integrations"] = integrations
+        
+        console.print(f"\n[yellow]Available integrations:[/yellow]")
+        integration_list = list(integrations.keys())
+        for i, (name, int_config) in enumerate(integrations.items(), 1):
+            if isinstance(int_config, dict):
+                enabled = "✅" if int_config.get("enabled", False) else "❌"
+                path = int_config.get("path", "Not set")
+                limit = int_config.get("path_limit")
+                limit_str = f" (limit: {limit} chars)" if limit else ""
+                console.print(f"  [green]{i}[/green]) {name.upper()}: {enabled} {path}{limit_str}")
+        
+        console.print(f"\n[green]Options:[/green]")
+        console.print(f"  [green]1-{len(integration_list)}[/green]) Configure integration")
+        console.print(f"  [green]q[/green]) Back to settings")
+        
+        choice = input(f"\nChoice (1-{len(integration_list)}, q): ").strip().lower()
+        
+        if choice == "q":
+            break
+        elif choice.isdigit():
+            idx = int(choice) - 1
+            if 0 <= idx < len(integration_list):
+                integration_name = integration_list[idx]
+                configure_single_integration(config_manager, integration_name)
+        else:
+            console.print(f"[yellow]Invalid choice.[/yellow]")
+
+
+def configure_single_integration(config_manager: ConfigManager, integration_name: str):
+    """Configure a single integration"""
+    console.print(f"\n[cyan]🔧 CONFIGURING {integration_name.upper()} INTEGRATION[/cyan]")
+    
+    integration = config_manager.get_integration(integration_name)
+    if not integration or not isinstance(integration, dict):
+        console.print(f"[red]Integration {integration_name} not found[/red]")
+        return
+    
+    while True:
+        enabled = integration.get("enabled", False)
+        path = integration.get("path", "")
+        limit = integration.get("path_limit")
+        limit_str = f" (limit: {limit} chars)" if limit else " (no limit)"
+        
+        console.print(f"\n[yellow]{integration_name.upper()} Integration Settings:[/yellow]")
+        console.print(f"  Status: {'✅ Enabled' if enabled else '❌ Disabled'}")
+        console.print(f"  Path: {path if path else 'Not set'}")
+        console.print(f"  Path limit{limit_str}")
+        
+        console.print(f"\n[green]Options:[/green]")
+        console.print(f"  [green]1[/green]) {'Disable' if enabled else 'Enable'} integration")
+        console.print(f"  [green]2[/green]) Change path")
+        console.print(f"  [green]3[/green]) Test path (validate)")
+        console.print(f"  [green]q[/green]) Back")
+        
+        choice = input("Choice (1-3, q): ").strip().lower()
+        
+        if choice == "q":
+            break
+        elif choice == "1":
+            config_manager.enable_integration(integration_name, not enabled)
+            console.print(f"[green]{integration_name.upper()} integration {'enabled' if not enabled else 'disabled'}[/green]")
+        elif choice == "2":
+            current_path = integration.get("path", "")
+            console.print(f"\nCurrent path: {current_path}")
+            if limit:
+                console.print(f"[yellow]Note: Path must be ≤ {limit} characters for {integration_name.upper()}[/yellow]")
+            
+            new_path = input("Enter new path (Enter to keep current): ").strip()
+            if new_path:
+                if limit and len(new_path) > limit:
+                    console.print(f"[red]❌ Path too long: {len(new_path)} characters (limit: {limit})[/red]")
+                else:
+                    config_manager.set_integration_path(integration_name, new_path)
+                    console.print(f"[green]Path updated for {integration_name.upper()} integration[/green]")
+        elif choice == "3":
+            path = integration.get("path", "")
+            if not path:
+                console.print(f"[yellow]No path configured[/yellow]")
+            else:
+                from .utils.validation import PathValidator
+                if limit and len(path) > limit:
+                    console.print(f"[red]❌ Path too long: {len(path)} characters (limit: {limit})[/red]")
+                elif PathValidator.validate_destination_path_with_limit(path, limit):
+                    console.print(f"[green]✅ Path is valid[/green]")
+                else:
+                    console.print(f"[red]❌ Path validation failed[/red]")
+        else:
+            console.print(f"[yellow]Invalid choice.[/yellow]")
+        
+        # Refresh integration data
+        integration = config_manager.get_integration(integration_name)
+        if not isinstance(integration, dict):
+            break

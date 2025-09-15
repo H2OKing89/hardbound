@@ -20,17 +20,20 @@ Hardbound is a powerful command-line tool for managing large audiobook libraries
 ### Installation
 
 1. Clone or download the script:
+
    ```bash
    git clone https://github.com/yourusername/hardbound.git
    cd hardbound
    ```
 
 2. Make executable:
+
    ```bash
    chmod +x hardbound.py
    ```
 
 3. Optional: Install fzf for enhanced fuzzy search:
+
    ```bash
    # Ubuntu/Debian
    sudo apt install fzf
@@ -44,16 +47,19 @@ Hardbound is a powerful command-line tool for managing large audiobook libraries
 ### Basic Usage
 
 1. **Build Search Catalog** (recommended for large libraries):
+
    ```bash
    ./hardbound.py index /path/to/audiobooks
    ```
 
 2. **Interactive Search and Link**:
+
    ```bash
    ./hardbound.py select -m --link --dst-root /path/to/torrents
    ```
 
 3. **Classic Single Link**:
+
    ```bash
    ./hardbound.py --src /path/to/book --dst-root /path/to/torrents --commit
    ```
@@ -61,12 +67,14 @@ Hardbound is a powerful command-line tool for managing large audiobook libraries
 ## Commands
 
 ### Catalog Management
+
 - `index [paths...]`: Build/update searchable catalog
 - `search [terms]`: Search catalog with filters
 - `select [terms]`: Interactive selection with fzf
 - `manage <command>`: Database maintenance and index management
 
 ### Index Management Commands
+
 - `manage rebuild`: Rebuild database indexes for optimal performance
 - `manage clean`: Remove orphaned entries and clean up database
 - `manage optimize`: Optimize database structure and indexes
@@ -79,6 +87,7 @@ Hardbound is a powerful command-line tool for managing large audiobook libraries
 Hardbound includes comprehensive database maintenance tools to keep your audiobook catalog running smoothly:
 
 ### Database Maintenance
+
 ```bash
 # Rebuild indexes for optimal search performance
 ./hardbound.py manage rebuild
@@ -100,7 +109,9 @@ Hardbound includes comprehensive database maintenance tools to keep your audiobo
 ```
 
 ### Automatic Maintenance
+
 The system automatically handles:
+
 - **Path parsing**: Correctly identifies author/series/book structure
 - **ASIN extraction**: Supports multiple ASIN formats ({ASIN.B0C34GQRYZ}, [ASIN.B0CN7M36GD])
 - **Duplicate detection**: Prevents duplicate catalog entries
@@ -108,19 +119,24 @@ The system automatically handles:
 - **Index optimization**: Maintains search performance for large libraries
 
 ### Directory Structure Support
+
 Hardbound intelligently parses audiobook directory structures:
+
 - `Author/Series/Book/` - Full hierarchical organization
 - `Author/Book/` - Direct author-to-book mapping
 - Automatic exclusion of torrent destination folders
 - Pattern-based author and series detection
 
 ### Interactive Mode
+
 Run without arguments for full interactive menu:
+
 ```bash
 ./hardbound.py
 ```
 
 Features include:
+
 - Dashboard with library statistics
 - Advanced search with filters and sorting
 - Batch operations wizard
@@ -131,11 +147,13 @@ Features include:
 - Settings management
 
 ### Classic CLI Mode
+
 ```bash
 ./hardbound.py --src /source/dir --dst-root /dest/root --commit
 ```
 
 Options:
+
 - `--dry-run`: Preview changes (default)
 - `--commit`: Actually create links
 - `--force`: Overwrite existing files
@@ -176,7 +194,7 @@ Configuration is stored in `~/.config/hardbound/config.json`:
 
 ## File Structure
 
-```
+```bash
 hardbound/
 ├── hardbound.py          # Main script
 ├── README.md            # This file
@@ -188,26 +206,31 @@ hardbound/
 
 ## Examples
 
-### Link all books by an author:
+### Link all books by an author
+
 ```bash
 ./hardbound.py select --author "Neil Gaiman" -m --link --dst-root /torrents
 ```
 
-### Link a complete series:
+### Link a complete series
+
 ```bash
 ./hardbound.py select --series "The Wheel of Time" -m --link --dst-root /torrents
 ```
 
-### Batch file format:
-```
+### Batch file format
+
+```bash
 # Batch file: one link per line
 # Format: source_path|destination_path
 /mnt/library/Author/Book1|/mnt/torrents/Book1
 /mnt/library/Author/Book2|/mnt/torrents/Book2
 ```
 
-### Watch folder setup:
+### Watch folder setup
+
 Configure automatic linking of new downloads:
+
 ```bash
 ./hardbound.py  # Then select option 6 for watch folders
 ```
@@ -238,16 +261,6 @@ Configure automatic linking of new downloads:
 - **Slow searches**: Rebuild catalog with `index --force`
 - **Memory usage**: SQLite handles large catalogs efficiently
 - **Network drives**: Ensure proper filesystem support for hardlinks
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## Development
 
 ### Testing
 
@@ -282,6 +295,7 @@ pytest --cov=hardbound --cov-report=html
 #### Writing Tests
 
 Tests use pytest with the following conventions:
+
 - Test files: `test_*.py` or `*_test.py`
 - Test classes: `Test*`
 - Test functions: `test_*`
@@ -290,6 +304,7 @@ Tests use pytest with the following conventions:
 #### Coverage
 
 The test suite aims for high code coverage. Current coverage report:
+
 - Core utilities: ~90% coverage
 - Main business logic: ~10-20% coverage (room for improvement)
 
@@ -305,6 +320,7 @@ Hardbound maintains high code quality standards:
 ### CI/CD Pipeline
 
 Automated testing and quality checks via GitHub Actions:
+
 - **Multi-Python Support**: Tests on Python 3.8 through 3.13
 - **Coverage Reporting**: Automated coverage analysis with Codecov
 - **Quality Gates**: Static analysis and linting checks
@@ -328,7 +344,3 @@ MIT License - see LICENSE file for details
 - GitHub Issues: Report bugs and request features
 - Documentation: This README and inline help (`./hardbound.py --help`)
 - Community: Check GitHub discussions for tips and tricks
-
----
-
-**Happy listening! 🎧**
