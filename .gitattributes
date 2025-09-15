@@ -1,0 +1,36 @@
+# Enforce LF line endings
+* text=auto eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+
+# Python files
+*.py text diff=python
+
+# Configuration files
+*.yml text
+*.yaml text
+*.json text
+*.toml text
+*.cfg text
+*.ini text
+
+# Documentation
+*.md text
+*.rst text
+*.txt text
+
+# Scripts
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
+# Exclude from language detection (GitHub linguist)
+tests/ linguist-language=Python
+examples/ linguist-documentation
+docs/ linguist-documentation
+*.md linguist-documentation

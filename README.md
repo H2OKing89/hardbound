@@ -2,6 +2,15 @@
 
 Hardbound is a powerful command-line tool for managing large audiobook libraries. It creates hardlinks from your organized library to torrent directories, saving disk space while allowing you to seed without duplicating files.
 
+## Quick Start (Python 3.13+)
+
+```bash
+git clone https://github.com/H2OKing89/hardbound.git
+cd hardbound && ./scripts/bootstrap.sh
+```
+
+That's it! The bootstrap script sets up everything you need.
+
 ## Features
 
 - **Search-First Workflow**: Build a searchable catalog of 1000+ audiobooks for instant fuzzy search
@@ -15,30 +24,48 @@ Hardbound is a powerful command-line tool for managing large audiobook libraries
 - **Progress Indicators**: Visual feedback for long operations
 - **Cross-Platform**: Works on Linux, macOS, and Windows
 
-## Quick Start
+## Installation
 
-### Installation
+### Prerequisites
 
-1. Clone or download the script:
+- **Python 3.13+** is required
+- **Git** for cloning the repository
 
-   ```bash
-   git clone https://github.com/yourusername/hardbound.git
-   cd hardbound
-   ```
+### One-Command Setup
 
-2. Make executable:
+```bash
+git clone https://github.com/H2OKing89/hardbound.git
+cd hardbound && ./scripts/bootstrap.sh
+```
 
-   ```bash
-   chmod +x hardbound.py
-   ```
+The bootstrap script will:
+- Create a Python virtual environment
+- Install all dependencies (including development tools)
+- Set up pre-commit hooks for code quality
+- Initialize the project for development
 
-3. Optional: Install fzf for enhanced fuzzy search:
+### Manual Installation
 
-   ```bash
-   # Ubuntu/Debian
-   sudo apt install fzf
+If you prefer to install manually:
 
-   # macOS
+```bash
+git clone https://github.com/H2OKing89/hardbound.git
+cd hardbound
+python3.13 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
+pip install -e ".[all]"
+```
+
+### Development Setup
+
+For contributors, the bootstrap script installs everything you need:
+- **Ruff** for linting and formatting
+- **MyPy** for type checking  
+- **Pre-commit hooks** for automatic code quality checks
+- **Pytest** with coverage reporting
+- **Commitizen** for conventional commit messages
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development instructions.
    brew install fzf
 
    # Or download from https://github.com/junegunn/fzf
