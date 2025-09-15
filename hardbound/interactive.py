@@ -834,12 +834,10 @@ def search_and_link_wizard():
 
         for path_str in selected_paths:
             src = Path(path_str)
-            base_name = zero_pad_vol(src.name) if zero_pad else src.name
-            dst = dst_root / base_name
 
             print(f"\nProcessing: {src.name}")
-            plan_and_link(
-                src, dst, base_name, also_cover, zero_pad, False, False, stats
+            plan_and_link_red(
+                src, dst_root, also_cover, zero_pad, False, False, stats
             )
 
         summary_table(stats, perf_counter())
@@ -1006,11 +1004,9 @@ def folder_batch_wizard():
     also_cover = bool(config.get("also_cover", False))
 
     for book_dir in audiobook_dirs:
-        base_name = zero_pad_vol(book_dir.name) if zero_pad else book_dir.name
-        dst_dir = dst_root / base_name
         print(f"\nProcessing: {book_dir.name}")
-        plan_and_link(
-            book_dir, dst_dir, base_name, also_cover, zero_pad, False, False, stats
+        plan_and_link_red(
+            book_dir, dst_root, also_cover, zero_pad, False, False, stats
         )
 
     summary_table(stats, perf_counter())

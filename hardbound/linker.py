@@ -186,13 +186,21 @@ def normalize_weird_ext(src_name: str) -> str:
 
 
 def clean_base_name(name: str) -> str:
-    """Remove user tags from base name for cleaner destination names"""
-    # Remove common user tags like [H2OKing], [UserName], {ASIN.B09CVBWLZT}, etc.
-    # Pattern: consecutive [anything] or {anything} at the end of the name
+    """Remove user tags from base name but preserve ASIN for RED compliance"""
+    # Remove user tags like [H2OKing], [UserName] but preserve {ASIN.B09CVBWLZT}
     import re
-
-    # Remove all bracket and curly brace tags at the end (handles multiple consecutive tags)
+    
+    # First extract and preserve any ASIN tag
+    asin_match = re.search(r'\{ASIN\.[A-Z0-9]+\}', name)
+    asin_tag = asin_match.group(0) if asin_match else ""
+    
+    # Remove all bracket and curly brace tags at the end
     cleaned = re.sub(r"(\s*[\[\{][^\]\}]+[\]\}]\s*)+$", "", name)
+    
+    # Re-add the ASIN tag if it was present
+    if asin_tag:
+        cleaned = f"{cleaned} {asin_tag}"
+    
     return cleaned.strip()
 
 

@@ -338,23 +338,69 @@ def build_dst_paths(src: Path, dst_root: Path, extension: Optional[str] = None) 
             )
             return dst_dir, Path(minimal_filename)
     
-    # If still too long, return minimal version (this shouldn't happen with reasonable titles)
-    minimal_folder = build_folder_name(tokens, include_subtitle=False, include_year=False, include_author=False)
-    dst_dir = dst_root / minimal_folder
-    final_length = _torrent_path_length(minimal_folder, minimal_filename)
+    # Phase C: Title truncation as final fallback
+    logger.debug("trim.phase_c.start", phase="title_truncation")
     
-    logger.warning(
-        "trim.fallback_minimal", 
-        folder=minimal_folder, 
-        file=minimal_filename,
-        path_len=final_length,
-        path_cap=PATH_CAP,
-        within=final_length <= PATH_CAP,
-        trim_steps=["drop year", "drop author", "drop tag", "drop subtitle(file)", "drop year(folder)", "drop author(folder)", "drop subtitle(folder)"],
-        message="Used minimal viable form - may exceed 180 char limit"
-    )
+    # Calculate how much space we need for the essential parts
+    # Format will be: "Title... - vol_XX {ASIN.XXXXXXX}"
+    essential_parts = f" - {tokens.volume} {tokens.asin}"
+    extension = tokens.ext
+    # Need space for folder/filename (same content) + separator
+    # folder_name + "/" + filename = 2 * (title + essential_parts) + 1 + len(extension)
     
-    return dst_dir, Path(minimal_filename)
+    # Calculate max title length to fit under PATH_CAP
+    # 2 * (max_title_len + len(essential_parts)) + 1 + len(extension) <= PATH_CAP
+    # max_title_len <= (PATH_CAP - 1 - len(extension) - 2 * len(essential_parts)) / 2
+    max_title_len = (PATH_CAP - 1 - len(extension) - 2 * len(essential_parts)) // 2
+    
+    if len(tokens.title) > max_title_len:
+        # Truncate title, but leave room for "..." indicator
+        truncated_title = tokens.title[:max_title_len - 3] + "..."
+        logger.debug(
+            "trim.title_truncate",
+            original_title=tokens.title,
+            original_len=len(tokens.title),
+            truncated_title=truncated_title,
+            truncated_len=len(truncated_title),
+            max_allowed=max_title_len
+        )
+    else:
+        truncated_title = tokens.title
+    
+    # Build final truncated version
+    truncated_folder = f"{truncated_title} - {tokens.volume} {tokens.asin}"
+    truncated_filename = f"{truncated_title} - {tokens.volume} {tokens.asin}{tokens.ext}"
+    
+    dst_dir = dst_root / truncated_folder
+    final_length = _torrent_path_length(truncated_folder, truncated_filename)
+    
+    if final_length <= PATH_CAP:
+        logger.info(
+            "trim.ok",
+            phase="title_truncation", 
+            folder=truncated_folder,
+            file=truncated_filename,
+            path_len=final_length,
+            path_cap=PATH_CAP,
+            within=True,
+            trim_steps=["drop year", "drop author", "drop tag", "drop subtitle(file)", "drop year(folder)", "drop author(folder)", "drop subtitle(folder)", "truncate title"],
+            original_title_len=len(tokens.title),
+            truncated_title_len=len(truncated_title),
+            trim_level="title_truncation"
+        )
+        return dst_dir, Path(truncated_filename)
+    else:
+        # This should never happen with reasonable ASIN lengths, but just in case
+        logger.error(
+            "trim.failed",
+            folder=truncated_folder,
+            file=truncated_filename,
+            path_len=final_length,
+            path_cap=PATH_CAP,
+            within=False,
+            message="Even with maximum title truncation, path exceeds limit. Check ASIN length."
+        )
+        return dst_dir, Path(truncated_filename)
 
 
 def _torrent_path_length(folder_name: str, filename: str) -> int:
