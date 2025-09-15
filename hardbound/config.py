@@ -5,7 +5,7 @@ Configuration management with validation and migration
 import json
 import copy
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 from dataclasses import dataclass
 
 from .utils.validation import PathValidator
@@ -144,6 +144,7 @@ class ConfigManager:
 
         # Start with defaults (deep copy to avoid reference issues)
         migrated = copy.deepcopy(DEFAULT_CONFIG)
+        assert isinstance(migrated["integrations"], dict)  # Tell Pylance it's a dict
 
         # Copy existing valid values
         for key, value in loaded_config.items():
@@ -163,8 +164,10 @@ class ConfigManager:
             # Preserve existing torrent_path in new integrations structure
             torrent_path = loaded_config.get("torrent_path", "")
             if torrent_path:
-                migrated["integrations"]["torrent"]["path"] = torrent_path
-                migrated["integrations"]["torrent"]["enabled"] = True
+                integrations_config = cast(Dict[str, Any], migrated["integrations"])
+                torrent_config = cast(Dict[str, Any], integrations_config["torrent"])
+                torrent_config["path"] = torrent_path
+                torrent_config["enabled"] = True
 
         migrated["version"] = DEFAULT_CONFIG["version"]
         return migrated
@@ -211,7 +214,9 @@ class ConfigManager:
         """Get integration configuration by name"""
         integrations = self.config.get("integrations", {})
         if isinstance(integrations, dict):
-            return integrations.get(name)
+            integration = integrations.get(name)
+            if isinstance(integration, dict):
+                return integration
         return None
 
     def get_enabled_integrations(self) -> Dict[str, Dict[str, Any]]:
@@ -230,7 +235,8 @@ class ConfigManager:
         integrations = self.config["integrations"]
         if isinstance(integrations, dict) and name in integrations:
             if isinstance(integrations[name], dict):
-                integrations[name]["path"] = path
+                integration_config = cast(Dict[str, Any], integrations[name])
+                integration_config["path"] = path
         else:
             raise ValueError(f"Unknown integration: {name}")
 
@@ -242,7 +248,8 @@ class ConfigManager:
         integrations = self.config["integrations"]
         if isinstance(integrations, dict) and name in integrations:
             if isinstance(integrations[name], dict):
-                integrations[name]["enabled"] = enabled
+                integration_config = cast(Dict[str, Any], integrations[name])
+                integration_config["enabled"] = enabled
         else:
             raise ValueError(f"Unknown integration: {name}")
 

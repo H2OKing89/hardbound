@@ -1698,6 +1698,8 @@ def configure_integrations_wizard(config_manager: ConfigManager):
             integrations = copy.deepcopy(DEFAULT_CONFIG["integrations"])
             config_manager.config["integrations"] = integrations
         
+        assert isinstance(integrations, dict)  # Tell Pylance integrations is a dict
+        
         console.print(f"\n[yellow]Available integrations:[/yellow]")
         integration_list = list(integrations.keys())
         for i, (name, int_config) in enumerate(integrations.items(), 1):

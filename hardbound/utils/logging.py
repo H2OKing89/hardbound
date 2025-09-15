@@ -96,7 +96,7 @@ def setup_logging(
 
     if console_enabled:
         if _HAS_RICH:
-            console_handler = RichHandler(
+            console_handler = RichHandler(  # type: ignore
                 show_time=False,  # structlog handles timestamps
                 rich_tracebacks=rich_tracebacks,
                 show_path=show_path,

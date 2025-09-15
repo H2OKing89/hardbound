@@ -17,7 +17,7 @@ from time import perf_counter
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 try:
-    from tqdm import tqdm
+    from tqdm import tqdm  # type: ignore
 
     HAS_TQDM = True
 except ImportError:
@@ -25,7 +25,7 @@ except ImportError:
 
 from rich.console import Console
 
-from .display import Sty, row, banner, section, summary_table
+from .display import Sty, row, banner, section, summary_table, term_width
 from .linker import set_file_permissions_and_ownership, set_dir_permissions_and_ownership, plan_and_link_red
 
 # Global console instance
