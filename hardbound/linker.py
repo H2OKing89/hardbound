@@ -9,12 +9,46 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from rich.console import Console
+from .red_paths import build_dst_paths, parse_tokens
 
 from .config import ConfigManager
 from .display import Sty, row
+from .utils.logging import get_logger, bind_operation_context
+from .utils.timing import log_step
 
 # Global console instance
 console = Console()
+
+# Get logger for this module
+log = get_logger(__name__)
+
+
+def _enforce_asin_policy(folder_name: str, filename: str, asin: str) -> None:
+    """
+    Enforce policy that ASIN must be present in both folder and file names.
+    
+    Args:
+        folder_name: Destination folder name
+        filename: Destination file name
+        asin: Expected ASIN (e.g., "{ASIN.B0CW3NF5NY}")
+        
+    Raises:
+        ValueError: If ASIN is missing from folder or file
+    """
+    in_folder = asin in folder_name
+    in_file = asin in filename
+    
+    if not in_folder or not in_file:
+        log.error(
+            "policy.asin_missing",
+            asin=asin,
+            in_folder=in_folder,
+            in_file=in_file,
+            folder=folder_name,
+            file=filename,
+            message="ASIN must be present in both folder and file names for RED compliance"
+        )
+        raise ValueError(f"ASIN policy violation: {asin} missing from folder or file")
 
 
 def set_file_permissions_and_ownership(file_path: Path):
@@ -22,18 +56,23 @@ def set_file_permissions_and_ownership(file_path: Path):
     config_manager = ConfigManager()
     config = config_manager.load_config()
     
+    logger = log.bind(file_path=str(file_path))
+    
     if config.get("set_permissions", False):
         file_perms = config.get("file_permissions", 0o644)
         if isinstance(file_perms, int):
             try:
                 os.chmod(file_path, file_perms)
-                console.print(f"[dim]  🔒 chmod {oct(file_perms)[-3:]}[/dim]")
+                logger.debug("permissions.file_set", permissions=oct(file_perms))
             except OSError as e:
-                console.print(f"[yellow]⚠️  Permission setting failed: {e}[/yellow]")
+                logger.error("permissions.file_failed", error=str(e), permissions=oct(file_perms))
+        else:
+            logger.warning("permissions.file_invalid", configured_perms=file_perms)
     
     if config.get("set_ownership", False):
         owner_user = config.get("owner_user", "")
         owner_group = config.get("owner_group", "")
+        
         if (isinstance(owner_user, str) and owner_user) or (isinstance(owner_group, str) and owner_group):
             try:
                 import pwd
@@ -58,7 +97,9 @@ def set_file_permissions_and_ownership(file_path: Path):
                     gid = -1
                     
                 os.chown(file_path, uid, gid)
-                console.print(f"[dim]  👤 chown {owner_user}:{owner_group}[/dim]")
+                logger.debug("ownership.file_set", user=owner_user, group=owner_group, uid=uid, gid=gid)
+            except (KeyError, OSError) as e:
+                logger.error("ownership.file_failed", error=str(e), user=owner_user, group=owner_group)
             except (OSError, KeyError, ValueError) as e:
                 console.print(f"[yellow]⚠️  Ownership setting failed: {e}[/yellow]")
 
@@ -205,25 +246,32 @@ def choose_base_outputs(dest_dir: Path, base_name: str):
 
 
 def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
+    """Create hardlink from src to dst with proper error handling and logging"""
+    logger = log.bind(src=str(src), dst=str(dst), force=force, dry_run=dry_run)
+    
     # Safety: ensure we have a valid source
     if src is None or not isinstance(src, Path):
+        logger.warning("link.skip_invalid_src", reason="invalid_source", src=str(src), dst=str(dst))
         row("🚫", Sty.GREY, "skip", Path("—"), dst, dry_run)
         stats["skipped"] += 1
         return
 
     if not dry_run and not src.exists():
+        logger.warning("link.skip_missing_src", reason="source_not_found", src=str(src), dst=str(dst))
         row("⚠️ ", Sty.YELLOW, "skip", src, dst, dry_run)
         stats["skipped"] += 1
         return
 
     # Respect destination exclusions
     if dest_is_excluded(dst):
+        logger.debug("link.skip_excluded", reason="destination_excluded", src=str(src), dst=str(dst))
         row("🚫", Sty.GREY, "excl.", src, dst, dry_run)
         stats["excluded"] += 1
         return
 
     # Already hardlinked?
     if dst.exists() and same_inode(src, dst):
+        logger.debug("link.skip_already_linked", reason="same_inode", src=str(src), dst=str(dst))
         row("✓", Sty.GREY, "ok", src, dst, dry_run)
         stats["already"] += 1
         return
@@ -231,6 +279,7 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
     # Replace if exists & force
     if dst.exists() and force:
         if dry_run:
+            logger.info("link.replaced", action="replace", mode="dry_run", src=str(src), dst=str(dst))
             row("↻", Sty.YELLOW, "repl", src, dst, dry_run)
             stats["replaced"] += 1
         else:
@@ -238,9 +287,11 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
                 dst.unlink()
                 os.link(src, dst)
                 set_file_permissions_and_ownership(dst)
+                logger.info("link.replaced", action="replace", mode="commit", src=str(src), dst=str(dst))
                 row("↻", Sty.BLUE, "repl", src, dst, dry_run)
                 stats["replaced"] += 1
             except OSError as e:
+                logger.error("link.error", action="replace", error=str(e), src=str(src), dst=str(dst))
                 row("💥", Sty.RED, "err", src, dst, dry_run)
                 print(
                     f"\x1b[31m    {e}\x1b[0m", file=sys.stderr
@@ -248,28 +299,80 @@ def do_link(src: Path, dst: Path, force: bool, dry_run: bool, stats: dict):
                 stats["errors"] += 1
         return
 
-    # Don’t overwrite without force
+    # Don't overwrite without force
     if dst.exists() and not force:
+        logger.debug("link.exists", reason="destination_exists_no_force", src=str(src), dst=str(dst))
         row("⏭️", Sty.YELLOW, "exist", src, dst, dry_run)
         stats["exists"] += 1
         return
 
     # Create link
     if dry_run:
+        logger.info("link.created", action="create", mode="dry_run", src=str(src), dst=str(dst))
         row("🔗", Sty.YELLOW, "link", src, dst, dry_run)
         stats["linked"] += 1
     else:
         try:
             os.link(src, dst)
             set_file_permissions_and_ownership(dst)
+            logger.info("link.created", action="create", mode="commit", src=str(src), dst=str(dst))
             row("🔗", Sty.GREEN, "link", src, dst, dry_run)
             stats["linked"] += 1
         except OSError as e:
+            logger.error("link.error", action="create", error=str(e), src=str(src), dst=str(dst))
             row("💥", Sty.RED, "err", src, dst, dry_run)
-            print(f"\x1b[31m    {e}\x1b[0m", file=sys.stderr)  # Keep ANSI for stderr
-            stats["errors"] += 1
 
 
+@log_step("linker.plan_red")
+def plan_and_link_red(
+    src_dir: Path,
+    dst_root: Path,
+    also_cover: bool,
+    zero_pad: bool,
+    force: bool,
+    dry_run: bool,
+    stats: dict,
+):
+    """RED-compliant version of plan_and_link using path shortening"""
+    logger = log.bind(
+        src_dir=str(src_dir),
+        dst_root=str(dst_root),
+        force=force,
+        dry_run=dry_run
+    )
+    
+    # Use RED path system to determine destination
+    dst_dir, dst_file = build_dst_paths(src_dir, dst_root)
+    
+    # Extract ASIN from source for validation
+    from .red_paths import parse_tokens
+    tokens = parse_tokens(src_dir.name, dst_file.suffix)
+    asin = tokens.asin
+    
+    # Bind content context for this book
+    book_logger = logger.bind(
+        asin=asin,
+        title=tokens.title,
+        volume=f"vol_{tokens.volume}" if tokens.volume else None
+    )
+    
+    # Enforce ASIN policy: must be in both folder and file
+    _enforce_asin_policy(dst_dir.name, dst_file.name, asin)
+    
+    book_logger.debug("linker.red_paths_processed", 
+                      original_src=str(src_dir),
+                      trimmed_dst_dir=str(dst_dir),
+                      trimmed_filename=str(dst_file),
+                      policy_validated=True)
+    
+    # Extract base name from the generated filename (without extension)
+    base_name = dst_file.stem
+    
+    # Call the original plan_and_link with trimmed paths
+    plan_and_link(src_dir, dst_dir, base_name, also_cover, zero_pad, force, dry_run, stats)
+
+
+@log_step("linker.plan")
 def plan_and_link(
     src_dir: Path,
     dst_dir: Path,
@@ -280,16 +383,30 @@ def plan_and_link(
     dry_run: bool,
     stats: dict,
 ):
+    """Main linking function with structured logging and context binding"""
+    logger = log.bind(
+        src_dir=str(src_dir),
+        dst_dir=str(dst_dir),
+        base_name=base_name,
+        force=force,
+        dry_run=dry_run,
+        also_cover=also_cover
+    )
+    
     if zero_pad:
         base_name = zero_pad_vol(base_name)
+        logger.debug("linker.name_zero_padded", new_base_name=base_name)
 
     ensure_dir(dst_dir, dry_run, stats)
     outputs = choose_base_outputs(dst_dir, base_name)
+    logger.debug("linker.outputs_planned", output_paths=[str(p) for p in outputs.values()])
 
     # Gather source files
     try:
         files = list(src_dir.iterdir())
+        logger.debug("linker.files_discovered", file_count=len(files))
     except FileNotFoundError:
+        logger.error("linker.src_dir_not_found", src_dir=str(src_dir))
         print(
             f"\x1b[31m[ERR] Source directory not found: {src_dir}\x1b[0m",
             file=sys.stderr,
@@ -298,6 +415,7 @@ def plan_and_link(
         return
 
     if not files:
+        logger.warning("linker.no_files_found", src_dir=str(src_dir))
         console.print(f"[yellow][WARN] No files found in {src_dir}[/yellow]")
         return
 
@@ -306,6 +424,10 @@ def plan_and_link(
     for p in files:
         fixed_name = normalize_weird_ext(p.name)
         normalized.append((p, fixed_name))
+    
+    logger.debug("linker.files_normalized", 
+                 original_count=len(files),
+                 normalized_count=len(normalized))
 
     # Prioritize linking: cue, audio, image, docs
     for src_path, fixed_name in normalized:
@@ -372,7 +494,11 @@ def plan_and_link(
                     dry_run=dry_run,
                     stats=stats,
                 )
+                logger.debug("linker.cover_link_attempted", 
+                             named_cover=str(named_cover), 
+                             plain_cover=str(plain_cover))
         else:
+            logger.debug("linker.cover_excluded", plain_cover=str(plain_cover))
             row("🚫", Sty.GREY, "excl.", named_cover, plain_cover, dry_run)
 
 
@@ -409,6 +535,16 @@ def preflight_checks(src: Path, dst: Path) -> bool:
 def run_batch(batch_file: Path, also_cover, zero_pad, force, dry_run):
     """Process batch file with src|dst pairs"""
     from .display import Sty, section
+    
+    logger = log.bind(
+        batch_file=str(batch_file),
+        also_cover=also_cover,
+        zero_pad=zero_pad,
+        force=force,
+        dry_run=dry_run
+    )
+    
+    logger.info("batch.start", operation="run_batch")
 
     stats = {
         "linked": 0,
@@ -419,21 +555,52 @@ def run_batch(batch_file: Path, also_cover, zero_pad, force, dry_run):
         "skipped": 0,
         "errors": 0,
     }
-    with batch_file.open() as fh:
-        for line in fh:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            try:
-                src_s, dst_s = [x.strip() for x in line.split("|", 1)]
-            except ValueError:
-                console.print(
-                    f"[yellow][WARN] bad line (expected 'SRC|DST'): {line}[/yellow]"
-                )
-                continue
-            src = Path(src_s)
-            dst = Path(dst_s)
-            base = dst.name
-            section(f"🎧 {base}")
-            plan_and_link(src, dst, base, also_cover, zero_pad, force, dry_run, stats)
+    
+    try:
+        with batch_file.open() as fh:
+            line_count = 0
+            processed_count = 0
+            
+            for line in fh:
+                line_count += 1
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                    
+                try:
+                    src_s, dst_s = [x.strip() for x in line.split("|", 1)]
+                    processed_count += 1
+                except ValueError:
+                    logger.warning("batch.bad_line", line_number=line_count, content=line)
+                    console.print(
+                        f"[yellow][WARN] bad line (expected 'SRC|DST'): {line}[/yellow]"
+                    )
+                    continue
+                    
+                src = Path(src_s)
+                dst = Path(dst_s)
+                base = dst.name
+                
+                # Bind context for this book
+                from .utils.logging import bind_audiobook_context
+                bind_audiobook_context(asin=base, title=base, volume="")
+                logger.debug("batch.processing_book", src=str(src), dst=str(dst), base=base)
+                section(f"🎧 {base}")
+                plan_and_link(src, dst, base, also_cover, zero_pad, force, dry_run, stats)
+        
+        logger.info("batch.complete", 
+                   operation="run_batch",
+                   lines_read=line_count,
+                   books_processed=processed_count,
+                   **stats)
+                   
+    except FileNotFoundError:
+        logger.error("batch.file_not_found", batch_file=str(batch_file))
+        console.print(f"[red]❌ Batch file not found: {batch_file}[/red]")
+        stats["errors"] += 1
+    except Exception as e:
+        logger.error("batch.unexpected_error", error=str(e), error_type=type(e).__name__)
+        console.print(f"[red]❌ Unexpected error processing batch: {e}[/red]")
+        stats["errors"] += 1
+        
     return stats

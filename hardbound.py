@@ -13,8 +13,9 @@ from rich.console import Console
 from hardbound.display import Sty, banner, section, summary_table
 from hardbound.commands import index_command, manage_command, search_command, select_command
 from hardbound.interactive import interactive_mode
-from hardbound.linker import plan_and_link, preflight_checks, zero_pad_vol, run_batch
+from hardbound.linker import plan_and_link, plan_and_link_red, preflight_checks, zero_pad_vol, run_batch
 from hardbound.config import load_config
+from hardbound.utils.logging import setup_logging, get_logger, bind
 
 # Global console instance
 console = Console()
@@ -58,33 +59,77 @@ def _classic_cli_mode(args):
 
     # If using dst-root, compute the real destination folder and base name
     if args.dst_root:
-        base = args.base_name or args.src.name
-        dst_dir = args.dst_root / base
+        # Use RED-compliant linking when dst_root is provided
+        start = perf_counter()
+        banner("Audiobook Hardlinker", "dry" if dry else "commit")
+        
+        section("Plan")
+        console.print(f"[bold] SRC[/bold]: {args.src}")
+        console.print(f"[bold] DST_ROOT[/bold]: {args.dst_root}")
+        console.print(f"[bold] MODE[/bold]: {'DRY-RUN' if dry else 'COMMIT'} (RED-compliant)")
+        console.print(f"[bold] OPTS[/bold]: zero_pad_vol={args.zero_pad_vol}  also_cover={args.also_cover}  force={args.force}")
+        print()
+
+        stats = {"linked":0, "replaced":0, "already":0, "exists":0, "excluded":0, "skipped":0, "errors":0}
+        plan_and_link_red(args.src, args.dst_root, args.also_cover, args.zero_pad_vol, args.force, dry, stats)
+        summary_table(stats, perf_counter() - start)
+        return
     else:
+        # Traditional mode for explicit dst directory
         dst_dir = args.dst
         base = args.base_name or args.dst.name
+        
+        # Run preflight checks
+        if not preflight_checks(args.src, dst_dir):
+            sys.exit(1)
 
-    # Run preflight checks
-    if not preflight_checks(args.src, dst_dir):
-        sys.exit(1)
+        start = perf_counter()
+        banner("Audiobook Hardlinker", "dry" if dry else "commit")
+        
+        section("Plan")
+        console.print(f"[bold] SRC[/bold]: {args.src}")
+        console.print(f"[bold] DST[/bold]: {dst_dir}")
+        console.print(f"[bold] BASE[/bold]: {base}")
+        console.print(f"[bold] MODE[/bold]: {'DRY-RUN' if dry else 'COMMIT'} (traditional)")
+        console.print(f"[bold] OPTS[/bold]: zero_pad_vol={args.zero_pad_vol}  also_cover={args.also_cover}  force={args.force}")
+        print()
 
-    start = perf_counter()
-    banner("Audiobook Hardlinker", "dry" if dry else "commit")
-    
-    section("Plan")
-    console.print(f"[bold] SRC[/bold]: {args.src}")
-    console.print(f"[bold] DST[/bold]: {dst_dir}")
-    console.print(f"[bold] BASE[/bold]: {base}")
-    console.print(f"[bold] MODE[/bold]: {'DRY-RUN' if dry else 'COMMIT'}")
-    console.print(f"[bold] OPTS[/bold]: zero_pad_vol={args.zero_pad_vol}  also_cover={args.also_cover}  force={args.force}")
-    print()
-
-    stats = {"linked":0, "replaced":0, "already":0, "exists":0, "excluded":0, "skipped":0, "errors":0}
-    plan_and_link(args.src, dst_dir, base, args.also_cover, args.zero_pad_vol, args.force, dry, stats)
-    summary_table(stats, perf_counter() - start)
+        stats = {"linked":0, "replaced":0, "already":0, "exists":0, "excluded":0, "skipped":0, "errors":0}
+        plan_and_link(args.src, dst_dir, base, args.also_cover, args.zero_pad_vol, args.force, dry, stats)
+        summary_table(stats, perf_counter() - start)
 
 def main():
     """Main program entry point"""
+    # Load configuration first
+    config = load_config()
+    
+    # Initialize structured logging
+    logging_config = config.get("logging", {})
+    setup_logging(
+        level=logging_config.get("level", "INFO"),
+        file_enabled=logging_config.get("file_enabled", True),
+        console_enabled=logging_config.get("console_enabled", True),
+        json_file=logging_config.get("json_file", True),
+        log_path=Path(logging_config.get("path", "/mnt/cache/scripts/hardbound/logs/hardbound.log")),
+        rotate_max_bytes=logging_config.get("rotate_max_bytes", 10 * 1024 * 1024),
+        rotate_backups=logging_config.get("rotate_backups", 5),
+        rich_tracebacks=logging_config.get("rich_tracebacks", True),
+        show_path=logging_config.get("show_path", False),
+    )
+    
+    # Set global context with schema versioning and correlation ID
+    from uuid import uuid4
+    job_id = str(uuid4())
+    bind(
+        app="hardbound",
+        schema="1.0", 
+        app_version="2.0.0",
+        run_id=str(uuid4()),
+        job_id=job_id
+    )
+    log = get_logger(__name__)
+    log.info("startup", logger_level=logging_config.get("level", "INFO"))
+    
     ap = argparse.ArgumentParser(
         description="Hardbound - Scalable audiobook hardlink manager",
         epilog="Examples:\n"

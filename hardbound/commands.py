@@ -26,7 +26,7 @@ except ImportError:
 from rich.console import Console
 
 from .display import Sty, row, banner, section, summary_table
-from .linker import set_file_permissions_and_ownership, set_dir_permissions_and_ownership
+from .linker import set_file_permissions_and_ownership, set_dir_permissions_and_ownership, plan_and_link_red
 
 # Global console instance
 console = Console()
@@ -1525,24 +1525,27 @@ def select_command(args):
 
         for path_str in selected_paths:
             src = Path(path_str)
-            base_name = zero_pad_vol(src.name) if zero_pad else src.name
-            dst = dst_root / base_name
-
-            # Validate path length if limit is set
-            if path_limit and len(str(dst)) > path_limit:
-                console.print(f"[yellow]⚠️  Skipping {src.name}: Path too long ({len(str(dst))} > {path_limit} chars)[/yellow]")
+            
+            # For path length validation, we need to compute the RED path
+            from .red_paths import build_dst_paths
+            _, dst_file = build_dst_paths(src, dst_root)
+            
+            # Use a reasonable estimate for path length checking
+            estimated_path_len = len(str(dst_root)) + len(str(dst_file)) + 50  # folder name estimate
+            if path_limit and estimated_path_len > path_limit:
+                console.print(f"[yellow]⚠️  Skipping {src.name}: Path likely too long[/yellow]")
                 stats["skipped"] += 1
                 continue
 
             console.print(f"\n[bold]{src.name}[/bold]")
 
             if args.dry_run:
-                plan_and_link(
-                    src, dst, clean_folder_name, also_cover, zero_pad, False, True, stats
+                plan_and_link_red(
+                    src, dst_root, also_cover, zero_pad, False, True, stats
                 )
             else:
-                plan_and_link(
-                    src, dst, clean_folder_name, also_cover, zero_pad, False, False, stats
+                plan_and_link_red(
+                    src, dst_root, also_cover, zero_pad, False, False, stats
                 )
 
         summary_table(stats, perf_counter())

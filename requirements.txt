@@ -15,6 +15,7 @@
 
 # Required dependencies
 rich>=13.0.0  # Beautiful CLI interfaces with proper Unicode support
+structlog>=23.0.0  # Structured logging with context binding
 
 # Optional dependencies
 tqdm>=4.64.0  # Progress bars (optional)

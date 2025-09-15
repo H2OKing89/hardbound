@@ -6,11 +6,26 @@ import json
 import copy
 from pathlib import Path
 from typing import Any, Dict, Optional
+from dataclasses import dataclass
 
 from .utils.validation import PathValidator
 
 CONFIG_DIR = Path.home() / ".config" / "hardbound"
 CONFIG_FILE = CONFIG_DIR / "config.json"
+DEFAULT_LOG_DIR = Path("/mnt/cache/scripts/hardbound/logs")
+
+@dataclass
+class LoggingConfig:
+    """Configuration for structured logging with Rich console and JSON file output"""
+    level: str = "INFO"          # DEBUG, INFO, WARNING, ERROR
+    file_enabled: bool = True
+    console_enabled: bool = True
+    json_file: bool = True
+    path: Path = DEFAULT_LOG_DIR / "hardbound.log"
+    rotate_max_bytes: int = 10 * 1024 * 1024  # 10 MiB
+    rotate_backups: int = 5
+    rich_tracebacks: bool = True
+    show_path: bool = False       # rich console "path=…" decoration
 
 # Configuration schema with defaults and validation
 DEFAULT_CONFIG = {
@@ -49,6 +64,17 @@ DEFAULT_CONFIG = {
     "auto_update_catalog": True,
     "parallel_processing": True,
     "max_parallel_jobs": 4,
+    "logging": {
+        "level": "INFO",
+        "file_enabled": True,
+        "console_enabled": True,
+        "json_file": True,
+        "path": str(DEFAULT_LOG_DIR / "hardbound.log"),
+        "rotate_max_bytes": 10 * 1024 * 1024,  # 10 MiB
+        "rotate_backups": 5,
+        "rich_tracebacks": True,
+        "show_path": False
+    }
 }
 
 CONFIG_VALIDATORS = {

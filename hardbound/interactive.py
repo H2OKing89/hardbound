@@ -17,13 +17,17 @@ from rich.console import Console
 from .catalog import DB_FILE, AudiobookCatalog
 from .config import load_config, save_config, ConfigManager, DEFAULT_CONFIG
 from .display import Sty, summary_table
-from .linker import plan_and_link, zero_pad_vol, clean_base_name
+from .linker import plan_and_link, plan_and_link_red, zero_pad_vol
 from .ui.feedback import ErrorHandler, ProgressIndicator, VisualFeedback
 from .ui.menu import create_main_menu, create_quick_actions_menu, menu_system
 from .utils.validation import InputValidator, PathValidator
+from .utils.logging import get_logger
 
 # Global Rich console for consistent output
 console = Console()
+
+# Get structured logger for interactive module
+log = get_logger(__name__)
 
 
 def _get_recent_sources(config):
@@ -1371,6 +1375,24 @@ def settings_menu():
         else:
             owner_display = "❌ Disabled"
         
+        # Display logging settings
+        logging_config = config.get('logging', {})
+        if isinstance(logging_config, dict):
+            log_level = logging_config.get('level', 'INFO')
+            log_file_enabled = logging_config.get('file_enabled', True)
+            log_console_enabled = logging_config.get('console_enabled', True)
+            log_json = logging_config.get('json_file', True)
+        else:
+            log_level = 'INFO'
+            log_file_enabled = True
+            log_console_enabled = True
+            log_json = True
+        
+        log_level_display = f"[cyan]{log_level}[/cyan]"
+        log_file_display = "✅ Enabled" if log_file_enabled else "❌ Disabled"
+        log_console_display = "✅ Enabled" if log_console_enabled else "❌ Disabled"
+        log_format_display = "JSON + Console" if log_json and log_console_enabled else ("JSON" if log_json else ("Console" if log_console_enabled else "None"))
+        
         console.print(
             f"""
 [yellow]Current settings:[/yellow]
@@ -1383,6 +1405,10 @@ def settings_menu():
   File permissions: {file_perm_display}
   Directory permissions: {dir_perm_display}
   Ownership: {owner_display}
+  Logging level: {log_level_display}
+  Log file: {log_file_display}
+  Log console: {log_console_display}
+  Log format: {log_format_display}
   Recent sources: {', '.join(_get_recent_sources(config)[:5])}
 
 [green]Options:[/green]
@@ -1394,13 +1420,14 @@ def settings_menu():
   6) Configure file permissions
   7) Configure directory permissions
   8) Configure ownership
-  9) Add recent source
- 10) Remove recent source
- 11) Reset settings to default
- 12) Back to main menu
+  9) Configure logging
+ 10) Add recent source
+ 11) Remove recent source
+ 12) Reset settings to default
+ 13) Back to main menu
 """
         )
-        choice = input("Select an option (1-12): ").strip()
+        choice = input("Select an option (1-13): ").strip()
 
         if choice == "1":
             new_path = input("Enter new library path: ").strip()
@@ -1432,6 +1459,8 @@ def settings_menu():
         elif choice == "8":
             configure_ownership_wizard(config)
         elif choice == "9":
+            configure_logging_wizard(config)
+        elif choice == "10":
             source = input("Enter source path to add: ").strip()
             recent_sources = config.get("recent_sources", [])
             if not isinstance(recent_sources, list):
@@ -1440,7 +1469,7 @@ def settings_menu():
                 recent_sources.append(source)
                 config["recent_sources"] = recent_sources
                 console.print(f"[green]Source added to recent sources.[/green]")
-        elif choice == "10":
+        elif choice == "11":
             source = input("Enter source path to remove: ").strip()
             recent_sources = config.get("recent_sources", [])
             if not isinstance(recent_sources, list):
@@ -1449,7 +1478,7 @@ def settings_menu():
                 recent_sources.remove(source)
                 config["recent_sources"] = recent_sources
                 console.print(f"[green]Source removed from recent sources.[/green]")
-        elif choice == "11":
+        elif choice == "12":
             # Reset to default settings
             config = {
                 "first_run": True,
@@ -1465,9 +1494,20 @@ def settings_menu():
                 "owner_user": "",
                 "owner_group": "",
                 "recent_sources": [],
+                "logging": {
+                    "level": "INFO",
+                    "file_enabled": True,
+                    "console_enabled": True,
+                    "json_file": True,
+                    "log_path": "/mnt/cache/scripts/hardbound/logs/hardbound.log",
+                    "rotate_max_bytes": 10485760,
+                    "rotate_backups": 5,
+                    "rich_tracebacks": True,
+                    "show_path": False
+                }
             }
             console.print(f"[green]Settings reset to default.[/green]")
-        elif choice == "12":
+        elif choice == "13":
             break
         else:
             console.print(f"[red]Invalid choice, please try again.[/red]")
@@ -1598,13 +1638,10 @@ def _link_selected_paths(selected_paths: List[str]):
 
     for path_str in selected_paths:
         src = Path(path_str)
-        base_name = zero_pad_vol(src.name) if zero_pad else src.name
-        # Clean base name for RED compliance (remove user tags)
-        clean_folder_name = clean_base_name(base_name)
-        dst_dir = dst_root / clean_folder_name
+        
         console.print(f"\n[cyan]Processing: {src.name}[/cyan]")
-        plan_and_link(
-            src, dst_dir, clean_folder_name, also_cover, zero_pad, False, False, stats
+        plan_and_link_red(
+            src, dst_root, also_cover, zero_pad, False, False, stats
         )
 
     summary_table(stats, perf_counter())
@@ -1757,3 +1794,139 @@ def configure_single_integration(config_manager: ConfigManager, integration_name
         integration = config_manager.get_integration(integration_name)
         if not isinstance(integration, dict):
             break
+
+
+def configure_logging_wizard(config):
+    """Configure logging settings wizard"""
+    log.info("logging.config_wizard_start", operation="configure_logging")
+    
+    console.print(f"\n[cyan]📋 LOGGING CONFIGURATION[/cyan]")
+    
+    # Ensure logging config exists
+    if "logging" not in config:
+        config["logging"] = {}
+    
+    logging_config = config["logging"]
+    if not isinstance(logging_config, dict):
+        logging_config = config["logging"] = {}
+    
+    while True:
+        # Display current settings
+        level = logging_config.get("level", "INFO")
+        file_enabled = logging_config.get("file_enabled", True)
+        console_enabled = logging_config.get("console_enabled", True)
+        json_file = logging_config.get("json_file", True)
+        log_path = logging_config.get("log_path", "/mnt/cache/scripts/hardbound/logs/hardbound.log")
+        rotate_max_bytes = logging_config.get("rotate_max_bytes", 10485760)
+        rotate_backups = logging_config.get("rotate_backups", 5)
+        rich_tracebacks = logging_config.get("rich_tracebacks", True)
+        show_path = logging_config.get("show_path", False)
+        
+        console.print(f"""
+[yellow]Current logging settings:[/yellow]
+  Log level: [cyan]{level}[/cyan]
+  File logging: {'✅ Enabled' if file_enabled else '❌ Disabled'}
+  Console logging: {'✅ Enabled' if console_enabled else '❌ Disabled'}
+  JSON file format: {'✅ Enabled' if json_file else '❌ Disabled'}
+  Log file path: {log_path}
+  File rotation: {rotate_max_bytes // 1024 // 1024}MB, {rotate_backups} backups
+  Rich tracebacks: {'✅ Enabled' if rich_tracebacks else '❌ Disabled'}
+  Show file paths: {'✅ Enabled' if show_path else '❌ Disabled'}
+
+[green]Options:[/green]
+  1) Change log level (DEBUG/INFO/WARNING/ERROR)
+  2) Toggle file logging
+  3) Toggle console logging
+  4) Toggle JSON file format
+  5) Change log file path
+  6) Configure rotation settings
+  7) Toggle rich tracebacks
+  8) Toggle file path display
+  9) Apply settings (reinitialize logging)
+  q) Back to settings menu
+""")
+        
+        choice = input("Select option (1-9, q): ").strip().lower()
+        
+        if choice == "q":
+            break
+        elif choice == "1":
+            console.print("Available levels: DEBUG, INFO, WARNING, ERROR")
+            new_level = input("Enter log level: ").strip().upper()
+            if new_level in ["DEBUG", "INFO", "WARNING", "ERROR"]:
+                logging_config["level"] = new_level
+                log.info("logging.level_changed", new_level=new_level)
+                console.print(f"[green]Log level changed to {new_level}.[/green]")
+            else:
+                console.print("[red]Invalid level. Use DEBUG, INFO, WARNING, or ERROR.[/red]")
+        elif choice == "2":
+            logging_config["file_enabled"] = not file_enabled
+            new_state = "enabled" if logging_config["file_enabled"] else "disabled"
+            log.info("logging.file_toggled", enabled=logging_config["file_enabled"])
+            console.print(f"[green]File logging {new_state}.[/green]")
+        elif choice == "3":
+            logging_config["console_enabled"] = not console_enabled
+            new_state = "enabled" if logging_config["console_enabled"] else "disabled"
+            log.info("logging.console_toggled", enabled=logging_config["console_enabled"])
+            console.print(f"[green]Console logging {new_state}.[/green]")
+        elif choice == "4":
+            logging_config["json_file"] = not json_file
+            new_state = "enabled" if logging_config["json_file"] else "disabled"
+            log.info("logging.json_toggled", enabled=logging_config["json_file"])
+            console.print(f"[green]JSON file format {new_state}.[/green]")
+        elif choice == "5":
+            new_path = input("Enter new log file path: ").strip()
+            if new_path:
+                logging_config["log_path"] = new_path
+                log.info("logging.path_changed", new_path=new_path)
+                console.print(f"[green]Log path updated to {new_path}.[/green]")
+        elif choice == "6":
+            console.print("Configure file rotation:")
+            try:
+                max_mb = int(input(f"Max file size in MB (current: {rotate_max_bytes // 1024 // 1024}): ").strip())
+                backups = int(input(f"Number of backup files (current: {rotate_backups}): ").strip())
+                if max_mb > 0 and backups >= 0:
+                    logging_config["rotate_max_bytes"] = max_mb * 1024 * 1024
+                    logging_config["rotate_backups"] = backups
+                    log.info("logging.rotation_configured", max_bytes=logging_config["rotate_max_bytes"], backups=backups)
+                    console.print(f"[green]Rotation configured: {max_mb}MB, {backups} backups.[/green]")
+                else:
+                    console.print("[red]Invalid values. Size must be > 0, backups must be >= 0.[/red]")
+            except ValueError:
+                console.print("[red]Invalid input. Please enter numbers only.[/red]")
+        elif choice == "7":
+            logging_config["rich_tracebacks"] = not rich_tracebacks
+            new_state = "enabled" if logging_config["rich_tracebacks"] else "disabled"
+            log.info("logging.rich_tracebacks_toggled", enabled=logging_config["rich_tracebacks"])
+            console.print(f"[green]Rich tracebacks {new_state}.[/green]")
+        elif choice == "8":
+            logging_config["show_path"] = not show_path
+            new_state = "enabled" if logging_config["show_path"] else "disabled"
+            log.info("logging.show_path_toggled", enabled=logging_config["show_path"])
+            console.print(f"[green]File path display {new_state}.[/green]")
+        elif choice == "9":
+            # Apply settings by reinitializing logging
+            try:
+                from .utils.logging import setup_logging
+                from pathlib import Path
+                
+                setup_logging(
+                    level=logging_config.get("level", "INFO"),
+                    file_enabled=logging_config.get("file_enabled", True),
+                    console_enabled=logging_config.get("console_enabled", True),
+                    json_file=logging_config.get("json_file", True),
+                    log_path=Path(logging_config.get("log_path", "/mnt/cache/scripts/hardbound/logs/hardbound.log")),
+                    rotate_max_bytes=logging_config.get("rotate_max_bytes", 10485760),
+                    rotate_backups=logging_config.get("rotate_backups", 5),
+                    rich_tracebacks=logging_config.get("rich_tracebacks", True),
+                    show_path=logging_config.get("show_path", False)
+                )
+                log.info("logging.config_applied", operation="reinitialize_logging")
+                console.print("[green]Logging settings applied and reinitialized![/green]")
+            except Exception as e:
+                log.error("logging.config_apply_failed", error=str(e))
+                console.print(f"[red]Failed to apply settings: {e}[/red]")
+        else:
+            console.print("[yellow]Invalid choice.[/yellow]")
+    
+    log.info("logging.config_wizard_complete", operation="configure_logging")
