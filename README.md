@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge" alt="Status"/>
 </p>
 
-**🚀 A powerful command-line tool for managing large audiobook libraries**
+## 🚀 A powerful command-line tool for managing large audiobook libraries
 
 Create hardlinks from your organized library to torrent directories, saving disk space while allowing you to seed without duplicating files.
 
