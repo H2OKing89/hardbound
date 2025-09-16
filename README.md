@@ -1,44 +1,80 @@
-# Hardbound - Scalable Audiobook Hardlink Manager
+# 🎧 Hardbound - Scalable Audiobook Hardlink Manager
 
-Hardbound is a powerful command-line tool for managing large audiobook libraries. It creates hardlinks from your organized library to torrent directories, saving disk space while allowing you to seed without duplicating files.
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.13+-blue?style=for-the-badge&logo=python&logoColor=white" alt="Python Version"/>
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"/>
+  <img src="https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-lightgrey?style=for-the-badge" alt="Platform"/>
+  <img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge" alt="Status"/>
+</p>
 
-## Quick Start (Python 3.13+)
+**🚀 A powerful command-line tool for managing large audiobook libraries**
+
+Create hardlinks from your organized library to torrent directories, saving disk space while allowing you to seed without duplicating files.
+
+## 📑 Table of Contents
+
+- [⚡ Quick Start (Python 3.13+)](#-quick-start-python-313)
+- [✨ Features](#-features)
+- [🚀 Installation](#-installation)
+- [📖 Basic Usage](#-basic-usage)
+- [🎮 Commands](#-commands)
+- [Index Management](#index-management)
+- [Configuration](#configuration)
+- [Requirements](#requirements)
+- [Safety Features](#safety-features)
+- [File Structure](#file-structure)
+- [Examples](#examples)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+- [Support](#support)
+
+---
+
+## ⚡ Quick Start (Python 3.13+)
 
 ```bash
 git clone https://github.com/H2OKing89/hardbound.git
 cd hardbound && ./scripts/bootstrap.sh
 ```
 
-That's it! The bootstrap script sets up everything you need.
+🎉 **That's it!** The bootstrap script sets up everything you need.
 
-## Features
+## ✨ Features
 
-- **Search-First Workflow**: Build a searchable catalog of 1000+ audiobooks for instant fuzzy search
-- **Interactive Selection**: Use fzf for fuzzy finding and multi-selection, or fallback to hierarchical browser
-- **Batch Operations**: Link entire authors, series, or custom filters at once
-- **Watch Folders**: Automatically link new audiobooks as they appear
-- **Duplicate Detection**: Find and manage duplicate audiobooks
-- **Favorites System**: Bookmark frequently accessed audiobooks
-- **Dashboard**: Overview of library statistics and recent activity
-- **Undo Functionality**: Rollback recent operations with history tracking
-- **Progress Indicators**: Visual feedback for long operations
-- **Cross-Platform**: Works on Linux, macOS, and Windows
+- 🔍 **Search-First Workflow**: Build a searchable catalog of 1000+ audiobooks for instant fuzzy search
+- 🎯 **Interactive Selection**: Use fzf for fuzzy finding and multi-selection, or fallback to hierarchical browser
+- 📦 **Batch Operations**: Link entire authors, series, or custom filters at once
+- 👀 **Watch Folders**: Automatically link new audiobooks as they appear
+- 🔄 **Duplicate Detection**: Find and manage duplicate audiobooks
+- ⭐ **Favorites System**: Bookmark frequently accessed audiobooks
+- 📊 **Dashboard**: Overview of library statistics and recent activity
+- ↩️ **Undo Functionality**: Rollback recent operations with history tracking
+- 📈 **Progress Indicators**: Visual feedback for long operations
+- 🌐 **Cross-Platform**: Works on Linux, macOS, and Windows
 
-## Installation
+## 🚀 Installation
 
-### Prerequisites
+### 📋 Prerequisites
 
 - **Python 3.13+** is required
 - **Git** for cloning the repository
 
-### One-Command Setup
+### ⚡ One-Command Setup
 
 ```bash
 git clone https://github.com/H2OKing89/hardbound.git
 cd hardbound && ./scripts/bootstrap.sh
 ```
 
+> 💡 **Pro Tip**: The bootstrap script will:
+>
+> - 🐍 Create a Python virtual environment
+> - 📦 Install all dependencies (including development tools)
+> - 🎯 Set up pre-commit hooks for code quality
+> - 🔧 Initialize the project for development
+
 The bootstrap script will:
+
 - Create a Python virtual environment
 - Install all dependencies (including development tools)
 - Set up pre-commit hooks for code quality
@@ -56,51 +92,50 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
 pip install -e ".[all]"
 ```
 
-### Development Setup
+### 🛠️ Development Setup
 
 For contributors, the bootstrap script installs everything you need:
-- **Ruff** for linting and formatting
-- **MyPy** for type checking
-- **Pre-commit hooks** for automatic code quality checks
-- **Pytest** with coverage reporting
-- **Commitizen** for conventional commit messages
+
+- 🧹 **Ruff** for linting and formatting
+- 🔍 **MyPy** for type checking
+- 🎯 **Pre-commit hooks** for automatic code quality checks
+- 🧪 **Pytest** with coverage reporting
+- 📝 **Commitizen** for conventional commit messages
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed development instructions.
-   brew install fzf
 
-   # Or download from https://github.com/junegunn/fzf
-   ```
+## 📖 Basic Usage
 
-### Basic Usage
+### 🏗️ Step 1: Build Search Catalog (recommended for large libraries)
 
-1. **Build Search Catalog** (recommended for large libraries):
+```bash
+./hardbound.py index /path/to/audiobooks
+```
 
-   ```bash
-   ./hardbound.py index /path/to/audiobooks
-   ```
+### 🎯 Step 2: Interactive Search and Link
 
-2. **Interactive Search and Link**:
+```bash
+./hardbound.py select -m --link --dst-root /path/to/torrents
+```
 
-   ```bash
-   ./hardbound.py select -m --link --dst-root /path/to/torrents
-   ```
+### 🔗 Step 3: Classic Single Link
 
-3. **Classic Single Link**:
+```bash
+./hardbound.py --src /path/to/book --dst-root /path/to/torrents --commit
+```
 
-   ```bash
-   ./hardbound.py --src /path/to/book --dst-root /path/to/torrents --commit
-   ```
+## 🎮 Commands
 
-## Commands
+### 📚 Catalog Management
 
-### Catalog Management
+| Command | Description | Example |
+|---------|-------------|---------|
+| `index [paths...]` | 🔨 Build/update searchable catalog | `./hardbound.py index /audiobooks` |
+| `search [terms]` | 🔍 Search catalog with filters | `./hardbound.py search "brandon sanderson"` |
+| `select [terms]` | 🎯 Interactive selection with fzf | `./hardbound.py select --author "tolkien"` |
+| `manage <command>` | 🛠️ Database maintenance and index management | `./hardbound.py manage stats` |
 
-- `index [paths...]`: Build/update searchable catalog
-- `search [terms]`: Search catalog with filters
-- `select [terms]`: Interactive selection with fzf
-- `manage <command>`: Database maintenance and index management
-
-### Index Management Commands
+### 🔧 Index Management Commands
 
 - `manage rebuild`: Rebuild database indexes for optimal performance
 - `manage clean`: Remove orphaned entries and clean up database
@@ -209,6 +244,8 @@ Configuration is stored in `~/.config/hardbound/config.json`:
 - Python 3.8+
 - SQLite3 (usually included with Python)
 - Optional: fzf for enhanced fuzzy search
+  - Install with: `brew install fzf` (macOS)
+  - Or download from: <https://github.com/junegunn/fzf>
 - Optional: tqdm for progress bars
 
 ## Safety Features
