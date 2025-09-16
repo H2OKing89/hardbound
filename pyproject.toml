@@ -154,22 +154,5 @@ module = [
 ]
 ignore_errors = true
 
-[tool.commitizen]
-name = "cz_conventional_commits"
-tag_format = "v$version"
-version_scheme = "pep440"
-version_provider = "pep621"
-update_changelog_on_bump = true
-major_version_zero = false
-ignore_errors = true
-
-[tool.commitizen]
-name = "cz_conventional_commits"
-tag_format = "v$version"
-version_scheme = "pep440"
-version_provider = "pep621"
-update_changelog_on_bump = true
-major_version_zero = false
-
 [tool.poetry.dev-dependencies]
 types-setuptools = "^*"  # Latest version
