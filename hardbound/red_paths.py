@@ -99,27 +99,42 @@ def parse_tokens(name: str, extension: str = ".m4b") -> Tokens:
     if year_match:
         working = working[: year_match.start()].rstrip()
 
-    # Split remaining into parts by " - "
-    parts = [p.strip() for p in working.split(" - ") if p.strip()]
+    # Parse the new format: <title> vol_XX <subtitle>
+    # Look for volume pattern in the working string
+    vol_pattern = r"\b(vol_\d+)\b"
+    vol_match = re.search(vol_pattern, working, re.IGNORECASE)
 
-    if len(parts) < 2:
-        # Fallback: assume first part is title, try to find volume
-        title_part = parts[0] if parts else working
-        vol_match = re.search(r"vol_?\s*\d+", title_part, re.IGNORECASE)
-        if vol_match:
-            volume = normalize_volume(vol_match.group(0))
-            title = title_part.replace(vol_match.group(0), "").strip(" -")
-            subtitle = None
+    if vol_match:
+        volume_str = vol_match.group(1)
+        volume = normalize_volume(volume_str)
+
+        # Split around the volume to get title and subtitle
+        vol_start, vol_end = vol_match.span()
+        title_part = working[:vol_start].strip()
+        subtitle_part = working[vol_end:].strip()
+
+        # Clean up old format markers if present
+        # Remove trailing spaces/hyphens from title and leading spaces/hyphens from subtitle
+        title_part = title_part.rstrip(" -")
+        subtitle_part = subtitle_part.lstrip(" -")
+
+        title = title_part
+        subtitle = subtitle_part if subtitle_part else None
+    else:
+        # Fallback: no volume found, try old format or default
+        parts = [p.strip() for p in working.split(" - ") if p.strip()]
+
+        if len(parts) >= 2:
+            # Try old format: title - vol_XX - subtitle
+            title = parts[0]
+            volume_part = parts[1]
+            volume = normalize_volume(volume_part)
+            subtitle = " - ".join(parts[2:]) if len(parts) > 2 else None
         else:
-            title = title_part
+            # Last resort: assume first part is title, default volume
+            title = parts[0] if parts else working
             volume = "vol_01"  # Default
             subtitle = None
-    else:
-        # Standard format: title - vol_XX - subtitle
-        title = parts[0]
-        volume_part = parts[1]
-        volume = normalize_volume(volume_part)
-        subtitle = " - ".join(parts[2:]) if len(parts) > 2 else None
 
     return Tokens(
         title=title.strip(),
@@ -135,13 +150,13 @@ def parse_tokens(name: str, extension: str = ".m4b") -> Tokens:
 
 def _series_str(tokens: Tokens, include_subtitle: bool = True) -> str:
     """
-    Build the left-hand 'series' part using hyphen joiners:
-    <title> - <vol_00> [- <subtitle>]
+    Build the left-hand 'series' part using space joiners:
+    <title> <vol_00> [<subtitle>]
     """
     parts = [tokens.title, tokens.volume]
     if include_subtitle and tokens.subtitle:
         parts.append(tokens.subtitle)
-    return " - ".join(parts)
+    return " ".join(parts)
 
 
 def build_filename(
