@@ -11,6 +11,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
+from typing import Any
 
 from rich.console import Console
 
@@ -93,8 +94,8 @@ def hierarchical_browser(catalog) -> list[str]:
     all_items = catalog.search("*", limit=5000)
 
     # Build author index
-    authors_by_initial = {}
-    author_to_books = {}
+    authors_by_initial: dict[str, set[str]] = {}
+    author_to_books: dict[str, list[dict[str, Any]]] = {}
 
     for item in all_items:
         author = item.get("author", "Unknown")
@@ -190,7 +191,7 @@ def hierarchical_browser(catalog) -> list[str]:
     author_books = author_to_books[selected_author]
 
     # Group by series if applicable
-    series_groups = {}
+    series_groups: dict[str, list[dict[str, Any]]] = {}
     standalone = []
 
     for book in author_books:

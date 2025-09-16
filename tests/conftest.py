@@ -11,7 +11,7 @@ sys.path.insert(0, str(project_root))
 
 
 # Register custom markers
-def pytest_configure(config):
+def pytest_configure(config) -> None:
     """Register custom pytest markers"""
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"

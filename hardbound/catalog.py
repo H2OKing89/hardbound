@@ -637,7 +637,8 @@ class AudiobookCatalog:
         except sqlite3.OperationalError:
             # Fallback: check if FTS table has same number of rows as items table
             cursor = self.conn.execute("SELECT COUNT(*) FROM items")
-            items_count = cursor.fetchone()[0]
+            items_count_row = cursor.fetchone()
+            items_count = items_count_row[0] if items_count_row else 0
             cursor = self.conn.execute("SELECT COUNT(*) FROM items_fts")
             fts_count = cursor.fetchone()[0]
             stats["fts_integrity"] = items_count == fts_count
@@ -776,7 +777,7 @@ class AudiobookCatalog:
 
         # Simple in-memory cache (could be enhanced with TTL)
         if not hasattr(self, "_search_cache"):
-            self._search_cache = {}
+            self._search_cache: dict[str, list[dict[str, Any]]] = {}
 
         # Limit cache size to prevent memory issues
         if len(self._search_cache) > 100:
@@ -870,7 +871,7 @@ class AudiobookCatalog:
                 mtime = directory.stat().st_mtime
 
                 # Add computed fields
-                metadata = dict(meta)  # type: ignore
+                metadata = dict(meta)
                 metadata.update(
                     {
                         "path": str(directory),

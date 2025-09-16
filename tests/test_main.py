@@ -10,7 +10,7 @@ from pathlib import Path
 class TestArgumentParsing:
     """Test argument parsing logic via subprocess calls"""
 
-    def test_help_output(self):
+    def test_help_output(self) -> None:
         """Test that --help produces expected output"""
         result = subprocess.run(
             [
@@ -26,7 +26,7 @@ class TestArgumentParsing:
         assert "Hardbound" in result.stdout
         assert "usage:" in result.stdout
 
-    def test_version_output(self):
+    def test_version_output(self) -> None:
         """Test version information is available"""
         # Since there's no --version flag, we'll just test basic execution
         result = subprocess.run(
@@ -45,7 +45,7 @@ class TestArgumentParsing:
             result.returncode == 0 or result.returncode == 1
         )  # 1 is ok for interrupted interactive mode
 
-    def test_invalid_args_error(self):
+    def test_invalid_args_error(self) -> None:
         """Test that invalid arguments produce errors"""
         result = subprocess.run(
             [
