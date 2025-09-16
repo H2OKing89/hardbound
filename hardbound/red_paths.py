@@ -114,11 +114,9 @@ def parse_tokens(name: str, extension: str = ".m4b") -> Tokens:
         subtitle_part = working[vol_end:].strip()
 
         # Clean up old format markers if present
-        # Remove trailing " -" from title and leading "- " from subtitle
-        if title_part.endswith(" -"):
-            title_part = title_part[:-2].strip()
-        if subtitle_part.startswith("- "):
-            subtitle_part = subtitle_part[2:].strip()
+        # Remove trailing spaces/hyphens from title and leading spaces/hyphens from subtitle
+        title_part = title_part.rstrip(" -")
+        subtitle_part = subtitle_part.lstrip(" -")
 
         title = title_part
         subtitle = subtitle_part if subtitle_part else None

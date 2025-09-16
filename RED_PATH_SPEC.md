@@ -210,8 +210,8 @@ def test_trailing_paren_safety():
     assert "In Name" in t.title
     assert "(Tricky) Sub" == (t.subtitle or "")
 
-def test_hyphen_preservation():
-    """Test that series parts use hyphens, not spaces"""
+def test_space_separation():
+    """Test that series parts use spaces, not hyphens"""
     name = "Test Series vol_05 Long Subtitle (2023) (Author) {ASIN.B0TEST}"
     t = parse_tokens(name, ".m4b")
     filename = build_filename(t)
