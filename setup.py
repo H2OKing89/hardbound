@@ -12,6 +12,8 @@ setup(
     python_requires=">=3.13",
     install_requires=[],
     extras_require={
-        "progress": ["tqdm"],
+        "dev": [
+            "types-setuptools",
+        ],
     },
 )
