@@ -1056,7 +1056,7 @@ def maintenance_menu():
                 catalog.get_index_stats()  # Just call for side effects
 
                 console.print(
-                    f"  Database size: {db_stats.get('db_size', 0) / (1024*1024):.1f} MB"
+                    f"  Database size: {db_stats.get('db_size', 0) / (1024 * 1024):.1f} MB"
                 )
                 console.print(f"  Items table: {db_stats.get('items_rows', 0)} rows")
                 console.print(f"  FTS table: {db_stats.get('items_fts_rows', 0)} rows")
@@ -1070,7 +1070,7 @@ def maintenance_menu():
                 result = catalog.optimize_database(True)
                 console.print("[green]✅ Database optimized[/green]")
                 console.print(
-                    f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB"
+                    f"  Space saved: {result['space_saved'] / (1024 * 1024):.1f} MB"
                 )
                 console.print(f"  Time taken: {result['elapsed']:.2f}s")
 
@@ -1079,7 +1079,7 @@ def maintenance_menu():
                 result = catalog.vacuum_database(True)
                 console.print("[green]✅ Database vacuumed[/green]")
                 console.print(
-                    f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB"
+                    f"  Space saved: {result['space_saved'] / (1024 * 1024):.1f} MB"
                 )
 
             elif choice == "5":
@@ -1489,12 +1489,12 @@ def settings_menu():
         console.print(
             f"""
 [yellow]Current settings:[/yellow]
-  Library path: {config.get('library_path', '')}
-  Legacy torrent path: {config.get('torrent_path', '')}
+  Library path: {config.get("library_path", "")}
+  Legacy torrent path: {config.get("torrent_path", "")}
   Integrations:
 {integration_display}
-  Zero pad: {config.get('zero_pad', True)}
-  Also cover: {config.get('also_cover', False)}
+  Zero pad: {config.get("zero_pad", True)}
+  Also cover: {config.get("also_cover", False)}
   File permissions: {file_perm_display}
   Directory permissions: {dir_perm_display}
   Ownership: {owner_display}
@@ -1502,7 +1502,7 @@ def settings_menu():
   Log file: {log_file_display}
   Log console: {log_console_display}
   Log format: {log_format_display}
-  Recent sources: {', '.join(_get_recent_sources(config)[:5])}
+  Recent sources: {", ".join(_get_recent_sources(config)[:5])}
 
 [green]Options:[/green]
   1) Change library path
@@ -1942,13 +1942,13 @@ def configure_logging_wizard(config):
             f"""
 [yellow]Current logging settings:[/yellow]
   Log level: [cyan]{level}[/cyan]
-  File logging: {'✅ Enabled' if file_enabled else '❌ Disabled'}
-  Console logging: {'✅ Enabled' if console_enabled else '❌ Disabled'}
-  JSON file format: {'✅ Enabled' if json_file else '❌ Disabled'}
+  File logging: {"✅ Enabled" if file_enabled else "❌ Disabled"}
+  Console logging: {"✅ Enabled" if console_enabled else "❌ Disabled"}
+  JSON file format: {"✅ Enabled" if json_file else "❌ Disabled"}
   Log file path: {log_path}
   File rotation: {rotate_max_bytes // 1024 // 1024}MB, {rotate_backups} backups
-  Rich tracebacks: {'✅ Enabled' if rich_tracebacks else '❌ Disabled'}
-  Show file paths: {'✅ Enabled' if show_path else '❌ Disabled'}
+  Rich tracebacks: {"✅ Enabled" if rich_tracebacks else "❌ Disabled"}
+  Show file paths: {"✅ Enabled" if show_path else "❌ Disabled"}
 
 [green]Options:[/green]
   1) Change log level (DEBUG/INFO/WARNING/ERROR)

@@ -695,7 +695,7 @@ class AudiobookCatalog:
 
         if verbose:
             console.print(
-                f"[green]✅ Reclaimed {space_saved / (1024*1024):.1f} MB[/green]"
+                f"[green]✅ Reclaimed {space_saved / (1024 * 1024):.1f} MB[/green]"
             )
 
         return {"space_saved": space_saved, "final_size": end_size}

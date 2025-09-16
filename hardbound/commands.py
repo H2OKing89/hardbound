@@ -646,7 +646,7 @@ class AudiobookCatalog:
 
         if verbose:
             console.print(
-                f"[green]✅ Reclaimed {space_saved / (1024*1024):.1f} MB[/green]"
+                f"[green]✅ Reclaimed {space_saved / (1024 * 1024):.1f} MB[/green]"
             )
 
         return {"space_saved": space_saved, "final_size": end_size}
@@ -1338,7 +1338,7 @@ def manage_command(args):
             result = catalog.optimize_database(verbose)
             if verbose:
                 console.print("[green]✅ Database optimized[/green]")
-                print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
+                print(f"  Space saved: {result['space_saved'] / (1024 * 1024):.1f} MB")
                 print(f"  Time taken: {result['elapsed']:.2f}s")
 
         elif args.action == "stats":
@@ -1346,7 +1346,9 @@ def manage_command(args):
             catalog.get_index_stats()  # Just call for side effects
 
             console.print("[cyan]Database Statistics:[/cyan]")
-            print(f"  Database size: {db_stats.get('db_size', 0) / (1024*1024):.1f} MB")
+            print(
+                f"  Database size: {db_stats.get('db_size', 0) / (1024 * 1024):.1f} MB"
+            )
             print(f"  Items table: {db_stats.get('items_rows', 0)} rows")
             print(f"  FTS table: {db_stats.get('items_fts_rows', 0)} rows")
             print(f"  Indexes: {len(db_stats.get('indexes', []))}")
@@ -1358,7 +1360,7 @@ def manage_command(args):
             result = catalog.vacuum_database(verbose)
             if verbose:
                 console.print("[green]✅ Database vacuumed[/green]")
-                print(f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB")
+                print(f"  Space saved: {result['space_saved'] / (1024 * 1024):.1f} MB")
 
         elif args.action == "verify":
             result = catalog.verify_integrity(verbose)
