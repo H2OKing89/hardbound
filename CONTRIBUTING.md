@@ -1,8 +1,10 @@
 # Contributing to hardbound
 
-3. **Make your changes** with tests
-4. **Test locally**: `pytest` or `pytest -q -m "not slow"`
-5. **Lint and format**: `ruff check --fix . && ruff format .` (or just commit - pre-commit hooks will handle it)Quick start (Python 3.13+)
+1. **Make your changes** with tests
+2. **Test locally**: `pytest` or `pytest -q -m "not slow"`
+3. **Lint and format**: `ruff check --fix . && ruff format .` (or just commit - pre-commit hooks will handle it)
+
+## Quick start (Python 3.13+)
 
 1. Install Python 3.13.
 2. Clone the repo and open a terminal in the project root.
@@ -44,7 +46,7 @@ PRs must pass pre-commit hooks (installed during bootstrap) and CI.
 
 ## Project structure
 
-```
+```bash
 hardbound/
 ├── hardbound/           # Main package
 │   ├── __init__.py
