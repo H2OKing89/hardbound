@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 $python = ${env:PYTHON_BIN}
 if (-not $python) { $python = "py -3.13" }
 
-# venv
+# venv test
 & $python -m venv .venv
 & .\.venv\Scripts\Activate.ps1
 
