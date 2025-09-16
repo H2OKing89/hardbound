@@ -70,7 +70,7 @@ def setup_logging(
     file_enabled: bool = True,
     console_enabled: bool = True,
     json_file: bool = True,
-    log_path: Path = Path("/mnt/cache/scripts/hardbound/logs/hardbound.log"),
+    log_path: Path = Path("logs/hardbound.log"),
     rotate_max_bytes: int = 10 * 1024 * 1024,
     rotate_backups: int = 5,
     rich_tracebacks: bool = True,

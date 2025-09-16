@@ -182,11 +182,7 @@ def main():
         file_enabled=logging_config.get("file_enabled", True),
         console_enabled=logging_config.get("console_enabled", True),
         json_file=logging_config.get("json_file", True),
-        log_path=Path(
-            logging_config.get(
-                "path", "/mnt/cache/scripts/hardbound/logs/hardbound.log"
-            )
-        ),
+        log_path=Path(logging_config.get("path", "logs/hardbound.log")),
         rotate_max_bytes=logging_config.get("rotate_max_bytes", 10 * 1024 * 1024),
         rotate_backups=logging_config.get("rotate_backups", 5),
         rich_tracebacks=logging_config.get("rich_tracebacks", True),

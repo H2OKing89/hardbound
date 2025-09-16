@@ -6,7 +6,11 @@ repos:
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: mixed-line-ending
-        args: ['--fix=lf']  # Force all line endings to be LF
+        args: ['--fix=lf']
+        exclude: '\.ps1$'  # Exclude PowerShell scripts (they need CRLF)
+      - id: mixed-line-ending
+        args: ['--fix=crlf']
+        files: '\.ps1$'  # PowerShell scripts should use CRLF
       - id: check-yaml
       - id: check-added-large-files
         args: [--maxkb=5120]

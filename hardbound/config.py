@@ -12,7 +12,7 @@ from .utils.validation import PathValidator
 
 CONFIG_DIR = Path.home() / ".config" / "hardbound"
 CONFIG_FILE = CONFIG_DIR / "config.json"
-DEFAULT_LOG_DIR = Path("/mnt/cache/scripts/hardbound/logs")
+DEFAULT_LOG_DIR = Path.cwd() / "logs"
 
 
 @dataclass

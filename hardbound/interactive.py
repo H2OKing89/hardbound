@@ -1593,7 +1593,7 @@ def settings_menu():
                     "file_enabled": True,
                     "console_enabled": True,
                     "json_file": True,
-                    "log_path": "/mnt/cache/scripts/hardbound/logs/hardbound.log",
+                    "log_path": "logs/hardbound.log",
                     "rotate_max_bytes": 10485760,
                     "rotate_backups": 5,
                     "rich_tracebacks": True,
@@ -1931,9 +1931,7 @@ def configure_logging_wizard(config):
         file_enabled = logging_config.get("file_enabled", True)
         console_enabled = logging_config.get("console_enabled", True)
         json_file = logging_config.get("json_file", True)
-        log_path = logging_config.get(
-            "log_path", "/mnt/cache/scripts/hardbound/logs/hardbound.log"
-        )
+        log_path = logging_config.get("log_path", "logs/hardbound.log")
         rotate_max_bytes = logging_config.get("rotate_max_bytes", 10485760)
         rotate_backups = logging_config.get("rotate_backups", 5)
         rich_tracebacks = logging_config.get("rich_tracebacks", True)
@@ -2061,7 +2059,7 @@ def configure_logging_wizard(config):
                     log_path=Path(
                         logging_config.get(
                             "log_path",
-                            "/mnt/cache/scripts/hardbound/logs/hardbound.log",
+                            "logs/hardbound.log",
                         )
                     ),
                     rotate_max_bytes=logging_config.get("rotate_max_bytes", 10485760),
