@@ -16,7 +16,7 @@ console = Console()
 class ProgressManager:
     """Manager for progress indicators and spinners"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.active_progress = None
 
     def create_spinner(self, description: str) -> Progress:
@@ -56,11 +56,11 @@ class ProgressManager:
         task_id: TaskID,
         advance: int = 1,
         description: str | None = None,
-    ):
+    ) -> None:
         """Update progress task"""
         progress.update(task_id, advance=advance, description=description)
 
-    def finish_task(self, progress: Progress, task_id: TaskID):
+    def finish_task(self, progress: Progress, task_id: TaskID) -> None:
         """Mark task as completed"""
         progress.update(task_id, completed=True)
 

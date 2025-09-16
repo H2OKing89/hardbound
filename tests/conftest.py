@@ -5,13 +5,15 @@ Pytest configuration and fixtures
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add the project root to Python path for testing
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 
 # Register custom markers
-def pytest_configure(config) -> None:
+def pytest_configure(config: pytest.Config) -> None:
     """Register custom pytest markers"""
     config.addinivalue_line(
         "markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')"

@@ -17,7 +17,7 @@ from hardbound.linker import plan_and_link
 class TestCatalogIntegration:
     """Integration tests for catalog operations"""
 
-    def test_full_catalog_workflow(self):
+    def test_full_catalog_workflow(self) -> None:
         """Test complete catalog indexing and search workflow"""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -54,7 +54,7 @@ class TestCatalogIntegration:
 
                 catalog.close()
 
-    def test_catalog_persistence(self):
+    def test_catalog_persistence(self) -> None:
         """Test that catalog data persists between sessions"""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -88,7 +88,7 @@ class TestCatalogIntegration:
 class TestLinkingIntegration:
     """Integration tests for linking operations"""
 
-    def test_full_linking_workflow(self):
+    def test_full_linking_workflow(self) -> None:
         """Test complete linking workflow from source to destination"""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -139,7 +139,7 @@ class TestLinkingIntegration:
 class TestConfigIntegration:
     """Integration tests for configuration system"""
 
-    def test_config_workflow(self):
+    def test_config_workflow(self) -> None:
         """Test complete configuration load/save workflow"""
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -174,7 +174,7 @@ class TestConfigIntegration:
 class TestCliIntegration:
     """Integration tests for CLI operations"""
 
-    def test_help_command(self):
+    def test_help_command(self) -> None:
         """Test that help command works"""
         import subprocess
         import sys
@@ -193,7 +193,7 @@ class TestCliIntegration:
         assert "Hardbound" in result.stdout
         assert "usage:" in result.stdout
 
-    def test_invalid_command_handling(self):
+    def test_invalid_command_handling(self) -> None:
         """Test that invalid commands are handled gracefully"""
         import subprocess
         import sys

@@ -33,13 +33,13 @@ class Sty:
     enabled = True
 
     @classmethod
-    def off(cls):
+    def off(cls) -> None:
         cls.enabled = False
 
 
-def term_width(default=100):
+def term_width(default: int = 100) -> int:
     try:
-        return shutil.get_terminal_size().columns
+        return int(shutil.get_terminal_size().columns)
     except Exception:
         return default
 
@@ -66,7 +66,7 @@ def ellipsize(s: str, limit: int) -> str:
         return s[:keep] + "… " + s[-(limit - keep - 2) :]
 
 
-def banner(title: str, mode: str):
+def banner(title: str, mode: str) -> None:
     """Display a banner with title and mode using Rich Panel"""
     mode_tag = (
         "[yellow][DRY-RUN][/yellow]" if mode == "dry" else "[green][COMMIT][/green]"
@@ -78,7 +78,7 @@ def banner(title: str, mode: str):
     console.print(panel)
 
 
-def section(title: str):
+def section(title: str) -> None:
     """Display a section header using Rich"""
     console.print(f"\n[magenta]{title}[/magenta]")
     console.print("─" * term_width())
@@ -86,7 +86,7 @@ def section(title: str):
 
 def row(
     status_icon: str, status_color: str, kind: str, src: Path, dst: Path, dry: bool
-):
+) -> None:
     """Display a row with status using Rich"""
     # Convert ANSI color to Rich markup
     color_map = {
@@ -116,7 +116,7 @@ def strip_ansi(s: str) -> str:
     return re.sub(r"\x1b\[[0-9;]*m", "", s)
 
 
-def summary_table(stats: dict, elapsed: float):
+def summary_table(stats: dict, elapsed: float) -> None:
     """Display summary statistics using Rich Table"""
     table = Table(show_header=False, box=None)
     table.add_column("Metric", style="cyan")

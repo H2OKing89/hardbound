@@ -4,12 +4,14 @@ Timing decorator for automatic start/complete event logging
 """
 
 import time
+from collections.abc import Callable
 from functools import wraps
+from typing import Any
 
 from .logging import get_logger
 
 
-def log_step(event_base: str):
+def log_step(event_base: str) -> Callable:
     """
     Decorator to automatically emit start/complete events with timing.
 
@@ -26,9 +28,9 @@ def log_step(event_base: str):
             ...
     """
 
-    def decorator(fn):
+    def decorator(fn: Callable) -> Callable:
         @wraps(fn)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             log = get_logger(fn.__module__)
             log.info(f"{event_base}_start")
             t0 = time.perf_counter()

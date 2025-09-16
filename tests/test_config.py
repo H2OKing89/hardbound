@@ -13,7 +13,7 @@ from hardbound.config import load_config, save_config
 class TestConfig:
     """Test configuration loading and saving"""
 
-    def test_load_config_default(self):
+    def test_load_config_default(self) -> None:
         """Test loading default config when no file exists"""
         with patch("pathlib.Path.exists", return_value=False):
             config = load_config()
@@ -29,7 +29,7 @@ class TestConfig:
             assert "parallel_processing" in config
             assert "system_search_paths" in config
 
-    def test_load_config_from_file(self):
+    def test_load_config_from_file(self) -> None:
         """Test loading config from existing file"""
         test_config = {
             "first_run": False,
@@ -51,7 +51,7 @@ class TestConfig:
             assert config["also_cover"] is True
             assert config["recent_sources"] == ["/path1", "/path2"]
 
-    def test_load_config_invalid_json(self):
+    def test_load_config_invalid_json(self) -> None:
         """Test loading config with invalid JSON falls back to defaults"""
         with (
             patch("pathlib.Path.exists", return_value=True),
@@ -63,7 +63,7 @@ class TestConfig:
             config = load_config()
             assert config["first_run"] is True  # Should be default
 
-    def test_save_config(self):
+    def test_save_config(self) -> None:
         """Test saving config to file"""
         test_config = {"test_key": "test_value"}
 
@@ -81,8 +81,8 @@ class TestConfig:
                 saved_data = json.loads(temp_config_file.read_text())
                 assert saved_data == test_config
 
-    def test_save_config_creates_directory(self):
-        """Test that save_config creates the config directory if it doesn't exist"""
+    def test_save_config_creates_directory(self) -> None:
+        """Test that save_config creates parent directory if needed"""
         test_config = {"test_key": "test_value"}
 
         with tempfile.TemporaryDirectory() as temp_dir:
