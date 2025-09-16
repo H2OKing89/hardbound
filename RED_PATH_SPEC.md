@@ -39,16 +39,16 @@ Produce torrent-internal paths (`<folder>/<file>`) that **always**:
 ### Folder (destination directory leaf)
 
 ```bash
-<title> - <vol_XX> [- <subtitle>] [(year)] [(author)] {ASIN.xxxxx}
+<title> <vol_XX> [<subtitle>] [(year)] [(author)] {ASIN.xxxxx}
 ```
 
 ### File (destination filename)
 
 ```bash
-<title> - <vol_XX> [- <subtitle>] [(year)] [(author)] {ASIN.xxxxx} [H2OKing]<ext>
+<title> <vol_XX> [<subtitle>] [(year)] [(author)] {ASIN.xxxxx} [H2OKing]<ext>
 ```
 
-* Hyphens (`" - "`) join **title / volume / subtitle**.
+* Spaces separate **title / volume / subtitle**.
 * Space-separated tail holds `(year) (author) {ASIN} [tag]`.
 * Tag is optional and **last**.
 
@@ -132,17 +132,17 @@ Edge-safe notes:
 **Input (non-compliant):**
 
 ```bash
-Overlord - vol_13 - The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}/Overlord - vol_13 - The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}.m4b
+Overlord vol_13 The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}/Overlord vol_13 The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}.m4b
 ```
 
 **Trim path to compliant:**
 
 * Filename trims `(year)`, `(author)`, and `subtitle` →
-  `Overlord - vol_13 {ASIN.B0CW3NF5NY}.m4b`
+  `Overlord vol_13 {ASIN.B0CW3NF5NY}.m4b`
 * Folder remains full or trims down as needed. A fully compliant example you provided:
 
   ```bash
-  Overlord - vol_13 - The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}/Overlord - vol_13 {ASIN.B0CW3NF5NY}.m4b
+  Overlord vol_13 The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}/Overlord vol_13 {ASIN.B0CW3NF5NY}.m4b
   ```
 
   **Length:** 143 (compliant under 180).
@@ -150,7 +150,7 @@ Overlord - vol_13 - The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maru
 ### 2) With a tag
 
 * If space allows:
-  `Title - vol_05 - Subtitle (2021) (Author) {ASIN.B0XXXXX} [H2OKing].m4b`
+  `Title vol_05 Subtitle (2021) (Author) {ASIN.B0XXXXX} [H2OKing].m4b`
 * If trimming needed, tag drops **before** subtitle drops in the file (per priority).
 
 ### 3) Minimal viable (very long titles)
@@ -191,7 +191,7 @@ def test_minimal_invariants():
     assert f.endswith(".m4b")
 
 def test_overlord_trimming():
-    src = Path("/src/Overlord - vol_13 - The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}")
+    src = Path("/src/Overlord vol_13 The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}")
     dst_root = Path("/dst")
     dst_dir, dst_file = build_dst_paths(src, dst_root, ".m4b")
     folder, file = dst_dir.name, dst_file.name
@@ -202,7 +202,7 @@ def test_overlord_trimming():
     assert "vol_" in file
 
 def test_trailing_paren_safety():
-    tricky = "Title (2020) In Name - vol_02 - (Tricky) Sub (2024) (Real Author) {ASIN.B0XYZ}"
+    tricky = "Title (2020) In Name vol_02 (Tricky) Sub (2024) (Real Author) {ASIN.B0XYZ}"
     t = parse_tokens(tricky, ".m4b")
     # inner parens preserved in title/subtitle; trailing tokens extracted
     assert t.year == "(2024)"
@@ -212,14 +212,14 @@ def test_trailing_paren_safety():
 
 def test_hyphen_preservation():
     """Test that series parts use hyphens, not spaces"""
-    name = "Test Series - vol_05 - Long Subtitle (2023) (Author) {ASIN.B0TEST}"
+    name = "Test Series vol_05 Long Subtitle (2023) (Author) {ASIN.B0TEST}"
     t = parse_tokens(name, ".m4b")
     filename = build_filename(t)
     folder = build_folder_name(t)
 
-    # Both should have "Test Series - vol_05 - Long Subtitle" at the start
-    assert filename.startswith("Test Series - vol_05 - Long Subtitle")
-    assert folder.startswith("Test Series - vol_05 - Long Subtitle")
+    # Both should have "Test Series vol_05 Long Subtitle" at the start
+    assert filename.startswith("Test Series vol_05 Long Subtitle")
+    assert folder.startswith("Test Series vol_05 Long Subtitle")
 
 def test_deterministic_extension():
     """Test that extension selection follows deterministic priority"""
@@ -271,7 +271,7 @@ def test_volume_normalization():
 def test_path_cap_enforcement():
     """Test that paths never exceed the cap"""
     # Create a very long name that would exceed 180 chars
-    long_name = f"{'Very ' * 20}Long Title - vol_01 - {'Super ' * 10}Long Subtitle (2024) (Very Long Author Name) {{ASIN.B0VERYLONGASIN}}"
+    long_name = f"{'Very ' * 20}Long Title vol_01 {'Super ' * 10}Long Subtitle (2024) (Very Long Author Name) {{ASIN.B0VERYLONGASIN}}"
 
     src = Path(f"/src/{long_name}")
     dst_root = Path("/dst")
@@ -416,11 +416,11 @@ Emit one line per processed source for operational visibility:
 ```json
 {
   "timestamp": "2025-09-15T00:00:00Z",
-  "src_path": "/mnt/user/audiobooks/Overlord - vol_13 - The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}",
-  "src_name": "Overlord - vol_13 - The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}",
-  "dst_folder": "Overlord - vol_13 - The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}",
-  "dst_file": "Overlord - vol_13 {ASIN.B0CW3NF5NY}.m4b",
-  "torrent_path": "Overlord - vol_13 - The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}/Overlord - vol_13 {ASIN.B0CW3NF5NY}.m4b",
+  "src_path": "/mnt/user/audiobooks/Overlord vol_13 The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}",
+  "src_name": "Overlord vol_13 The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}",
+  "dst_folder": "Overlord vol_13 The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}",
+  "dst_file": "Overlord vol_13 {ASIN.B0CW3NF5NY}.m4b",
+  "torrent_path": "Overlord vol_13 The Paladin of the Sacred Kingdom Part 2 (2024) (Kugane Maruyama) {ASIN.B0CW3NF5NY}/Overlord vol_13 {ASIN.B0CW3NF5NY}.m4b",
   "length": 143,
   "cap": 180,
   "trim_steps": ["filename: drop year", "filename: drop author", "filename: drop subtitle"],
