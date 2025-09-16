@@ -8,15 +8,13 @@ import os
 import re
 import sqlite3
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import lru_cache
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any
 
 from rich.console import Console
-
-from .display import Sty
 
 # Global console instance
 console = Console()
@@ -52,30 +50,30 @@ class AudiobookCatalog:
                 has_m4b BOOLEAN,
                 has_mp3 BOOLEAN
             );
-            
+
             CREATE INDEX IF NOT EXISTS idx_mtime ON items(mtime DESC);
             CREATE INDEX IF NOT EXISTS idx_path ON items(path);
-            
+
             CREATE VIRTUAL TABLE IF NOT EXISTS items_fts USING fts5(
                 author, series, book, asin,
                 content='items',
                 content_rowid='id'
             );
-            
+
             CREATE TRIGGER IF NOT EXISTS items_ai AFTER INSERT ON items BEGIN
                 INSERT INTO items_fts(rowid, author, series, book, asin)
                 VALUES (new.id, new.author, new.series, new.book, new.asin);
             END;
-            
+
             CREATE TRIGGER IF NOT EXISTS items_au AFTER UPDATE ON items BEGIN
-                UPDATE items_fts SET 
+                UPDATE items_fts SET
                     author = new.author,
                     series = new.series,
                     book = new.book,
                     asin = new.asin
                 WHERE rowid = new.id;
             END;
-            
+
             CREATE TRIGGER IF NOT EXISTS items_ad AFTER DELETE ON items BEGIN
                 DELETE FROM items_fts WHERE rowid = old.id;
             END;
@@ -83,7 +81,7 @@ class AudiobookCatalog:
         )
         self.conn.commit()
 
-    def parse_audiobook_path(self, path: Path) -> Dict[str, str]:
+    def parse_audiobook_path(self, path: Path) -> dict[str, str]:
         """Extract author/series/book from path structure"""
         parts = path.parts
         result = {"author": "Unknown", "series": "", "book": path.name, "asin": ""}
@@ -317,7 +315,7 @@ class AudiobookCatalog:
             # Upsert into database
             self.conn.execute(
                 """
-                INSERT OR REPLACE INTO items 
+                INSERT OR REPLACE INTO items
                 (path, author, series, book, asin, mtime, size, file_count, has_m4b, has_mp3)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -350,7 +348,7 @@ class AudiobookCatalog:
 
         return count
 
-    def search(self, query: str, limit: int = 500) -> List[Dict]:
+    def search(self, query: str, limit: int = 500) -> list[dict]:
         """Full-text search the catalog with enhanced features"""
         if not query or query == "*":
             # Return recent items
@@ -386,7 +384,7 @@ class AudiobookCatalog:
 
     def get_autocomplete_suggestions(
         self, partial_query: str, limit: int = 10
-    ) -> List[str]:
+    ) -> list[str]:
         """Get autocomplete suggestions for partial queries"""
         if not partial_query or len(partial_query.strip()) < 2:
             return []
@@ -439,12 +437,12 @@ class AudiobookCatalog:
 
         return unique_suggestions[:limit]
 
-    def get_search_history(self, limit: int = 20) -> List[str]:
+    def get_search_history(self, limit: int = 20) -> list[str]:
         """Get recent search history"""
         try:
             history_file = Path.home() / ".cache" / "hardbound" / "search_history.txt"
             if history_file.exists():
-                with open(history_file, "r", encoding="utf-8") as f:
+                with open(history_file, encoding="utf-8") as f:
                     lines = f.readlines()
                     # Return most recent searches
                     return [line.strip() for line in lines[-limit:] if line.strip()]
@@ -461,7 +459,7 @@ class AudiobookCatalog:
             # Read existing history
             history = []
             if history_file.exists():
-                with open(history_file, "r", encoding="utf-8") as f:
+                with open(history_file, encoding="utf-8") as f:
                     history = [line.strip() for line in f.readlines() if line.strip()]
 
             # Remove duplicate if exists
@@ -483,11 +481,11 @@ class AudiobookCatalog:
             # Silently ignore history recording errors
             pass
 
-    def get_stats(self) -> Dict[str, int]:
+    def get_stats(self) -> dict[str, int]:
         """Get catalog statistics"""
         cursor = self.conn.execute(
             """
-            SELECT 
+            SELECT
                 COUNT(*) as total,
                 COUNT(DISTINCT author) as authors,
                 COUNT(DISTINCT series) as series,
@@ -498,10 +496,10 @@ class AudiobookCatalog:
         )
         return dict(cursor.fetchone())
 
-    def rebuild_indexes(self, verbose: bool = False) -> Dict[str, Any]:
+    def rebuild_indexes(self, verbose: bool = False) -> dict[str, Any]:
         """Rebuild all database indexes for optimal performance"""
         if verbose:
-            console.print(f"[yellow]Rebuilding database indexes...[/yellow]")
+            console.print("[yellow]Rebuilding database indexes...[/yellow]")
 
         start_time = perf_counter()
 
@@ -530,10 +528,10 @@ class AudiobookCatalog:
 
         return {"elapsed": elapsed}
 
-    def clean_orphaned_entries(self, verbose: bool = False) -> Dict[str, int]:
+    def clean_orphaned_entries(self, verbose: bool = False) -> dict[str, int]:
         """Remove entries for audiobooks that no longer exist on disk"""
         if verbose:
-            console.print(f"[yellow]Cleaning orphaned catalog entries...[/yellow]")
+            console.print("[yellow]Cleaning orphaned catalog entries...[/yellow]")
 
         cursor = self.conn.execute("SELECT id, path FROM items")
         orphaned = []
@@ -544,7 +542,7 @@ class AudiobookCatalog:
 
         if not orphaned:
             if verbose:
-                console.print(f"[green]✅ No orphaned entries found[/green]")
+                console.print("[green]✅ No orphaned entries found[/green]")
             return {"removed": 0, "checked": len(list(cursor))}
 
         # Remove orphaned entries
@@ -557,10 +555,10 @@ class AudiobookCatalog:
 
         return {"removed": len(orphaned), "checked": len(list(cursor))}
 
-    def optimize_database(self, verbose: bool = False) -> Dict[str, Any]:
+    def optimize_database(self, verbose: bool = False) -> dict[str, Any]:
         """Run database optimization routines"""
         if verbose:
-            console.print(f"[yellow]Optimizing database...[/yellow]")
+            console.print("[yellow]Optimizing database...[/yellow]")
 
         start_time = perf_counter()
 
@@ -571,7 +569,7 @@ class AudiobookCatalog:
         clean_stats = self.clean_orphaned_entries(verbose)
 
         # Rebuild indexes
-        rebuild_stats = self.rebuild_indexes(verbose)
+        self.rebuild_indexes(verbose)
 
         # Vacuum to reclaim space
         if verbose:
@@ -595,7 +593,7 @@ class AudiobookCatalog:
             "orphaned_removed": clean_stats.get("removed", 0),
         }
 
-    def get_db_stats(self) -> Dict[str, Any]:
+    def get_db_stats(self) -> dict[str, Any]:
         """Get detailed database statistics"""
         stats = {}
 
@@ -606,12 +604,12 @@ class AudiobookCatalog:
         # Table statistics
         cursor = self.conn.execute(
             """
-            SELECT 
+            SELECT
                 'items' as table_name,
                 COUNT(*) as row_count
             FROM items
             UNION ALL
-            SELECT 
+            SELECT
                 'items_fts' as table_name,
                 COUNT(*) as row_count
             FROM items_fts
@@ -624,8 +622,8 @@ class AudiobookCatalog:
         # Index information
         cursor = self.conn.execute(
             """
-            SELECT name, sql 
-            FROM sqlite_master 
+            SELECT name, sql
+            FROM sqlite_master
             WHERE type='index' AND name LIKE 'idx_%'
         """
         )
@@ -646,23 +644,23 @@ class AudiobookCatalog:
 
         return stats
 
-    def get_index_stats(self) -> Dict[str, Any]:
+    def get_index_stats(self) -> dict[str, Any]:
         """Get index usage and performance statistics"""
         stats = {}
 
         # Index sizes (approximate)
         cursor = self.conn.execute(
             """
-            SELECT 
+            SELECT
                 name,
                 'index' as type
-            FROM sqlite_master 
+            FROM sqlite_master
             WHERE type='index'
             UNION ALL
-            SELECT 
+            SELECT
                 name,
                 'table' as type
-            FROM sqlite_master 
+            FROM sqlite_master
             WHERE type='table'
         """
         )
@@ -683,10 +681,10 @@ class AudiobookCatalog:
 
         return stats
 
-    def vacuum_database(self, verbose: bool = False) -> Dict[str, int]:
+    def vacuum_database(self, verbose: bool = False) -> dict[str, int]:
         """Reclaim unused database space"""
         if verbose:
-            console.print(f"[yellow]Vacuuming database...[/yellow]")
+            console.print("[yellow]Vacuuming database...[/yellow]")
 
         start_size = DB_FILE.stat().st_size if DB_FILE.exists() else 0
 
@@ -702,10 +700,10 @@ class AudiobookCatalog:
 
         return {"space_saved": space_saved, "final_size": end_size}
 
-    def verify_integrity(self, verbose: bool = False) -> Dict[str, Any]:
+    def verify_integrity(self, verbose: bool = False) -> dict[str, Any]:
         """Verify database integrity and FTS5 consistency"""
         if verbose:
-            console.print(f"[yellow]Verifying database integrity...[/yellow]")
+            console.print("[yellow]Verifying database integrity...[/yellow]")
 
         results = {}
 
@@ -731,7 +729,7 @@ class AudiobookCatalog:
         cursor = self.conn.execute(
             """
             SELECT COUNT(*) as orphaned_fts
-            FROM items_fts 
+            FROM items_fts
             WHERE rowid NOT IN (SELECT id FROM items)
         """
         )
@@ -741,7 +739,7 @@ class AudiobookCatalog:
         cursor = self.conn.execute(
             """
             SELECT COUNT(*) as missing_fts
-            FROM items 
+            FROM items
             WHERE id NOT IN (SELECT rowid FROM items_fts)
         """
         )
@@ -763,14 +761,13 @@ class AudiobookCatalog:
         return results
 
     # Performance optimization methods
-    @lru_cache(maxsize=100)
     def _cached_search_hash(self, query: str, limit: int) -> str:
         """Generate cache key for search results"""
         return hashlib.md5(f"{query}:{limit}".encode()).hexdigest()
 
     def search_with_cache(
         self, query: str, limit: int = 500, use_cache: bool = True
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Search with optional caching for repeated queries"""
         if not use_cache:
             return self.search(query, limit)
@@ -780,6 +777,10 @@ class AudiobookCatalog:
         # Simple in-memory cache (could be enhanced with TTL)
         if not hasattr(self, "_search_cache"):
             self._search_cache = {}
+
+        # Limit cache size to prevent memory issues
+        if len(self._search_cache) > 100:
+            self._search_cache.clear()
 
         if cache_key in self._search_cache:
             return self._search_cache[cache_key]
@@ -792,7 +793,7 @@ class AudiobookCatalog:
         self,
         directory: Path,
         verbose: bool = True,
-        progress_callback: Optional[Callable] = None,
+        progress_callback: Callable | None = None,
         max_workers: int = 4,
     ) -> int:
         """Index directory with parallel processing for better performance"""
@@ -804,7 +805,7 @@ class AudiobookCatalog:
 
         # Collect all audio files first
         audio_files = []
-        for root, dirs, files in os.walk(directory):
+        for root, _dirs, files in os.walk(directory):
             for file in files:
                 if file.lower().endswith(
                     (".mp3", ".m4a", ".m4b", ".flac", ".ogg", ".wma")
@@ -908,7 +909,6 @@ class AudiobookCatalog:
         """Clear search cache"""
         if hasattr(self, "_search_cache"):
             self._search_cache.clear()
-        self._cached_search_hash.cache_clear()
 
     def close(self):
         self.conn.close()

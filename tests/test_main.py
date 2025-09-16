@@ -6,8 +6,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 
 class TestArgumentParsing:
     """Test argument parsing logic via subprocess calls"""

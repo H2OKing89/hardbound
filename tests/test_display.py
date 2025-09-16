@@ -2,7 +2,6 @@
 Tests for display utilities
 """
 
-import shutil
 from unittest.mock import patch
 
 from hardbound.display import Sty, banner, ellipsize, section, summary_table, term_width

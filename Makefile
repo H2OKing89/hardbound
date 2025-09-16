@@ -4,7 +4,7 @@
 .PHONY: help bootstrap activate lint fix test test-quick coverage release
 
 # Default target
-test: 
+test:
 	pytest -q
 
 help:

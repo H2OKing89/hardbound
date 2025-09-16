@@ -7,9 +7,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
-from hardbound.config import CONFIG_DIR, CONFIG_FILE, load_config, save_config
+from hardbound.config import load_config, save_config
 
 
 class TestConfig:
@@ -42,8 +40,9 @@ class TestConfig:
             "recent_sources": ["/path1", "/path2"],
         }
 
-        with patch("pathlib.Path.exists", return_value=True), patch(
-            "pathlib.Path.read_text", return_value=json.dumps(test_config)
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.read_text", return_value=json.dumps(test_config)),
         ):
             config = load_config()
             assert config["first_run"] is False
@@ -54,8 +53,12 @@ class TestConfig:
 
     def test_load_config_invalid_json(self):
         """Test loading config with invalid JSON falls back to defaults"""
-        with patch("pathlib.Path.exists", return_value=True), patch(
-            "pathlib.Path.read_text", side_effect=json.JSONDecodeError("Invalid", "", 0)
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch(
+                "pathlib.Path.read_text",
+                side_effect=json.JSONDecodeError("Invalid", "", 0),
+            ),
         ):
             config = load_config()
             assert config["first_run"] is True  # Should be default
@@ -68,8 +71,9 @@ class TestConfig:
             temp_config_dir = Path(temp_dir) / ".config" / "hardbound"
             temp_config_file = temp_config_dir / "config.json"
 
-            with patch("hardbound.config.CONFIG_DIR", temp_config_dir), patch(
-                "hardbound.config.CONFIG_FILE", temp_config_file
+            with (
+                patch("hardbound.config.CONFIG_DIR", temp_config_dir),
+                patch("hardbound.config.CONFIG_FILE", temp_config_file),
             ):
                 save_config(test_config)
 
@@ -85,8 +89,9 @@ class TestConfig:
             temp_config_dir = Path(temp_dir) / ".config" / "hardbound"
             temp_config_file = temp_config_dir / "config.json"
 
-            with patch("hardbound.config.CONFIG_DIR", temp_config_dir), patch(
-                "hardbound.config.CONFIG_FILE", temp_config_file
+            with (
+                patch("hardbound.config.CONFIG_DIR", temp_config_dir),
+                patch("hardbound.config.CONFIG_FILE", temp_config_file),
             ):
                 assert not temp_config_dir.exists()
                 save_config(test_config)

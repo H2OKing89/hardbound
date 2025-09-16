@@ -2,18 +2,11 @@
 Tests for core hardlinking functionality
 """
 
-import tempfile
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
 
 from hardbound.linker import (
-    AUDIO_EXTS,
     EXCLUDE_DEST_EXTS,
     EXCLUDE_DEST_NAMES,
-    IMG_EXTS,
-    WEIRD_SUFFIXES,
     clean_base_name,
     dest_is_excluded,
     normalize_weird_ext,

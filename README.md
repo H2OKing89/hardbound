@@ -60,7 +60,7 @@ pip install -e ".[all]"
 
 For contributors, the bootstrap script installs everything you need:
 - **Ruff** for linting and formatting
-- **MyPy** for type checking  
+- **MyPy** for type checking
 - **Pre-commit hooks** for automatic code quality checks
 - **Pytest** with coverage reporting
 - **Commitizen** for conventional commit messages

@@ -1,7 +1,7 @@
 """Visual feedback and messaging system with Rich"""
 
 import time
-from typing import Any, Dict, Optional
+from typing import Any
 
 from rich import box
 from rich.console import Console
@@ -16,21 +16,21 @@ class VisualFeedback:
 
     def success(self, message: str, details: str = ""):
         """Show success with icon and color"""
-        self.console.print(f"\n[green]✅ Success![/green]")
+        self.console.print("\n[green]✅ Success![/green]")
         self.console.print(f"   {message}")
         if details:
             self.console.print(f"   [dim]{details}[/dim]")
 
     def warning(self, message: str, suggestion: str = ""):
         """Show warning with helpful suggestion"""
-        self.console.print(f"\n[yellow]⚠️  Warning[/yellow]")
+        self.console.print("\n[yellow]⚠️  Warning[/yellow]")
         self.console.print(f"   {message}")
         if suggestion:
             self.console.print(f"   [cyan]💡 Tip: {suggestion}[/cyan]")
 
     def error(self, message: str, recovery: str = ""):
         """Show error with recovery options"""
-        self.console.print(f"\n[red]❌ Error[/red]")
+        self.console.print("\n[red]❌ Error[/red]")
         self.console.print(f"   {message}")
         if recovery:
             self.console.print(f"   [dim]Try: {recovery}[/dim]")
@@ -39,7 +39,7 @@ class VisualFeedback:
         """Show informational message"""
         self.console.print(f"\n[cyan]ℹ️  {message}[/cyan]")
 
-    def info_box(self, title: str, content: Dict[str, Any], width: int = 50):
+    def info_box(self, title: str, content: dict[str, Any], width: int = 50):
         """Display information in a formatted box using Rich"""
         # Create content string
         content_lines = []
@@ -61,7 +61,7 @@ class VisualFeedback:
 class ProgressIndicator:
     """Visual progress feedback for long operations with Rich"""
 
-    def __init__(self, title: str, total: Optional[int] = None):
+    def __init__(self, title: str, total: int | None = None):
         from rich.progress import (
             BarColumn,
             Progress,

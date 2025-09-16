@@ -3,12 +3,12 @@
 RED-compliant path shortening system
 Ensures paths fit within 180-character limit while preserving ASIN tags
 """
+
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
-from .utils.logging import bind_audiobook_context, get_logger
+from .utils.logging import get_logger
 
 # RED full-path limit
 PATH_CAP = 180
@@ -24,11 +24,11 @@ class Tokens:
 
     title: str
     volume: str  # normalized: "vol_00"
-    subtitle: Optional[str]
-    year: Optional[str]  # "(2024)" if present, else None
-    author: Optional[str]  # "(Kugane Maruyama)" if present, else None
+    subtitle: str | None
+    year: str | None  # "(2024)" if present, else None
+    author: str | None  # "(Kugane Maruyama)" if present, else None
     asin: str  # "{ASIN.B0CW3NF5NY}"
-    tag: Optional[str]  # e.g. "[H2OKing]"
+    tag: str | None  # e.g. "[H2OKing]"
     ext: str  # ".m4b"
 
 
@@ -192,7 +192,7 @@ def build_folder_name(
 
 
 def build_dst_paths(
-    src: Path, dst_root: Path, extension: Optional[str] = None
+    src: Path, dst_root: Path, extension: str | None = None
 ) -> tuple[Path, Path]:
     """
     Build destination paths with RED compliance (180 char limit)

@@ -1,7 +1,6 @@
 """Input validation and path handling utilities"""
 
 from pathlib import Path
-from typing import List, Optional
 
 from rich.console import Console
 
@@ -13,7 +12,7 @@ class PathValidator:
     """Centralized path validation"""
 
     @staticmethod
-    def validate_library_path(path_str: str) -> Optional[Path]:
+    def validate_library_path(path_str: str) -> Path | None:
         """Validate and return library path"""
         if not path_str or not path_str.strip():
             return None
@@ -23,19 +22,19 @@ class PathValidator:
         if not path.exists():
             console.print(f"[yellow]⚠️  Path does not exist: {path}[/yellow]")
             console.print(
-                f"[cyan]💡 Tip: Check if the path is mounted or spelled correctly[/cyan]"
+                "[cyan]💡 Tip: Check if the path is mounted or spelled correctly[/cyan]"
             )
             return None
 
         if not path.is_dir():
             console.print(f"[yellow]⚠️  Not a directory: {path}[/yellow]")
-            console.print(f"[cyan]💡 Tip: Expected a folder, got a file[/cyan]")
+            console.print("[cyan]💡 Tip: Expected a folder, got a file[/cyan]")
             return None
 
         return path
 
     @staticmethod
-    def validate_destination_path(path_str: str) -> Optional[Path]:
+    def validate_destination_path(path_str: str) -> Path | None:
         """Validate destination path (can be non-existent)"""
         if not path_str or not path_str.strip():
             return None
@@ -47,15 +46,15 @@ class PathValidator:
             console.print(
                 f"[yellow]⚠️  Parent directory does not exist: {path.parent}[/yellow]"
             )
-            console.print(f"[cyan]💡 Tip: Create the parent directory first[/cyan]")
+            console.print("[cyan]💡 Tip: Create the parent directory first[/cyan]")
             return None
 
         return path
 
     @staticmethod
     def validate_destination_path_with_limit(
-        path_str: str, limit: Optional[int] = None
-    ) -> Optional[Path]:
+        path_str: str, limit: int | None = None
+    ) -> Path | None:
         """Validate destination path with optional character limit"""
         if not path_str or not path_str.strip():
             return None
@@ -68,7 +67,7 @@ class PathValidator:
             console.print(
                 f"[yellow]⚠️  Path too long: {len(path_str)} characters (limit: {limit})[/yellow]"
             )
-            console.print(f"[cyan]💡 Tip: Use a shorter path or abbreviations[/cyan]")
+            console.print("[cyan]💡 Tip: Use a shorter path or abbreviations[/cyan]")
             return None
 
         # Check if parent exists
@@ -76,13 +75,13 @@ class PathValidator:
             console.print(
                 f"[yellow]⚠️  Parent directory does not exist: {path.parent}[/yellow]"
             )
-            console.print(f"[cyan]💡 Tip: Create the parent directory first[/cyan]")
+            console.print("[cyan]💡 Tip: Create the parent directory first[/cyan]")
             return None
 
         return path
 
     @staticmethod
-    def get_default_search_paths() -> List[Path]:
+    def get_default_search_paths() -> list[Path]:
         """Get sensible default search paths"""
         defaults = []
 
@@ -102,7 +101,7 @@ class PathValidator:
         return defaults
 
     @staticmethod
-    def suggest_similar_paths(input_path: str) -> List[str]:
+    def suggest_similar_paths(input_path: str) -> list[str]:
         """Suggest similar existing paths"""
         path = Path(input_path).expanduser()
         suggestions = []
@@ -124,8 +123,8 @@ class InputValidator:
 
     @staticmethod
     def get_choice(
-        prompt: str, valid_choices: List[str], default: Optional[str] = None
-    ) -> Optional[str]:
+        prompt: str, valid_choices: list[str], default: str | None = None
+    ) -> str | None:
         """Get validated choice from user"""
         while True:
             if default:
@@ -151,7 +150,7 @@ class InputValidator:
             )
 
     @staticmethod
-    def get_path(prompt: str, must_exist: bool = True) -> Optional[Path]:
+    def get_path(prompt: str, must_exist: bool = True) -> Path | None:
         """Get and validate path input"""
         while True:
             path_str = input(f"{prompt}: ").strip()
@@ -170,7 +169,7 @@ class InputValidator:
             # Offer suggestions
             suggestions = PathValidator.suggest_similar_paths(path_str)
             if suggestions:
-                console.print(f"[cyan]💡 Did you mean:[/cyan]")
+                console.print("[cyan]💡 Did you mean:[/cyan]")
                 for i, suggestion in enumerate(suggestions, 1):
                     console.print(f"   {i}. {suggestion}")
 
@@ -195,10 +194,10 @@ class InputValidator:
     @staticmethod
     def get_number(
         prompt: str,
-        min_val: Optional[int] = None,
-        max_val: Optional[int] = None,
-        default: Optional[int] = None,
-    ) -> Optional[int]:
+        min_val: int | None = None,
+        max_val: int | None = None,
+        default: int | None = None,
+    ) -> int | None:
         """Get validated number input"""
         while True:
             if default is not None:
@@ -223,4 +222,4 @@ class InputValidator:
                 return num
 
             except ValueError:
-                console.print(f"[yellow]⚠️  Please enter a valid number[/yellow]")
+                console.print("[yellow]⚠️  Please enter a valid number[/yellow]")

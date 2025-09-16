@@ -2,6 +2,7 @@
 """
 Timing decorator for automatic start/complete event logging
 """
+
 import time
 from functools import wraps
 

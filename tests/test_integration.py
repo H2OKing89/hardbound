@@ -2,7 +2,6 @@
 Integration tests for Hardbound audiobook hardlink manager
 """
 
-import shutil
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -148,10 +147,10 @@ class TestConfigIntegration:
             config_file = config_dir / "config.json"
 
             # Mock the config paths
-            with patch("hardbound.config.CONFIG_DIR", config_dir), patch(
-                "hardbound.config.CONFIG_FILE", config_file
+            with (
+                patch("hardbound.config.CONFIG_DIR", config_dir),
+                patch("hardbound.config.CONFIG_FILE", config_file),
             ):
-
                 # Test default config
                 config = load_config()
                 assert config["first_run"] is True

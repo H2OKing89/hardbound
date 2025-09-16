@@ -6,7 +6,7 @@ import copy
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional, cast
+from typing import Any, cast
 
 from .utils.validation import PathValidator
 
@@ -118,7 +118,7 @@ class ConfigManager:
     def __init__(self):
         self.config = {}
 
-    def load_config(self) -> Dict[str, Any]:
+    def load_config(self) -> dict[str, Any]:
         """Load configuration with validation and migration"""
         if CONFIG_FILE.exists():
             try:
@@ -133,7 +133,7 @@ class ConfigManager:
         self.config = DEFAULT_CONFIG.copy()
         return self.config
 
-    def save_config(self, config_data: Dict[str, Any]):
+    def save_config(self, config_data: dict[str, Any]):
         """Save configuration with validation"""
         # Validate before saving
         self._validate_config_data(config_data)
@@ -145,7 +145,7 @@ class ConfigManager:
         CONFIG_FILE.write_text(json.dumps(config_data, indent=2))
         self.config = config_data
 
-    def _migrate_config(self, loaded_config: Dict[str, Any]) -> Dict[str, Any]:
+    def _migrate_config(self, loaded_config: dict[str, Any]) -> dict[str, Any]:
         """Migrate configuration from older versions"""
         version = loaded_config.get("version", "0.0")
 
@@ -171,8 +171,8 @@ class ConfigManager:
             # Preserve existing torrent_path in new integrations structure
             torrent_path = loaded_config.get("torrent_path", "")
             if torrent_path:
-                integrations_config = cast(Dict[str, Any], migrated["integrations"])
-                torrent_config = cast(Dict[str, Any], integrations_config["torrent"])
+                integrations_config = cast(dict[str, Any], migrated["integrations"])
+                torrent_config = cast(dict[str, Any], integrations_config["torrent"])
                 torrent_config["path"] = torrent_path
                 torrent_config["enabled"] = True
 
@@ -183,7 +183,7 @@ class ConfigManager:
         """Validate current configuration"""
         self._validate_config_data(self.config)
 
-    def _validate_config_data(self, config_data: Dict[str, Any]):
+    def _validate_config_data(self, config_data: dict[str, Any]):
         """Validate configuration data against schema"""
         errors = []
 
@@ -217,7 +217,7 @@ class ConfigManager:
         """Reset configuration to defaults"""
         self.config = copy.deepcopy(DEFAULT_CONFIG)
 
-    def get_integration(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_integration(self, name: str) -> dict[str, Any] | None:
         """Get integration configuration by name"""
         integrations = self.config.get("integrations", {})
         if isinstance(integrations, dict):
@@ -226,7 +226,7 @@ class ConfigManager:
                 return integration
         return None
 
-    def get_enabled_integrations(self) -> Dict[str, Dict[str, Any]]:
+    def get_enabled_integrations(self) -> dict[str, dict[str, Any]]:
         """Get all enabled integrations"""
         integrations = self.config.get("integrations", {})
         if not isinstance(integrations, dict):
@@ -245,7 +245,7 @@ class ConfigManager:
         integrations = self.config["integrations"]
         if isinstance(integrations, dict) and name in integrations:
             if isinstance(integrations[name], dict):
-                integration_config = cast(Dict[str, Any], integrations[name])
+                integration_config = cast(dict[str, Any], integrations[name])
                 integration_config["path"] = path
         else:
             raise ValueError(f"Unknown integration: {name}")
@@ -258,7 +258,7 @@ class ConfigManager:
         integrations = self.config["integrations"]
         if isinstance(integrations, dict) and name in integrations:
             if isinstance(integrations[name], dict):
-                integration_config = cast(Dict[str, Any], integrations[name])
+                integration_config = cast(dict[str, Any], integrations[name])
                 integration_config["enabled"] = enabled
         else:
             raise ValueError(f"Unknown integration: {name}")

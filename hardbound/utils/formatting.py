@@ -1,7 +1,7 @@
 """Text formatting and display utilities"""
 
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 from rich import box
 from rich.console import Console
@@ -53,7 +53,7 @@ class TextFormatter:
         return text[: max_length - len(suffix)] + suffix
 
     @staticmethod
-    def format_path_list(paths: List[Path], max_items: int = 5) -> str:
+    def format_path_list(paths: list[Path], max_items: int = 5) -> str:
         """Format a list of paths for display"""
         if not paths:
             return "None"
@@ -72,7 +72,7 @@ class DisplayFormatter:
     """Rich-based display formatting utilities"""
 
     @staticmethod
-    def create_summary_table(data: List[Dict[str, Any]], title: str = "") -> Table:
+    def create_summary_table(data: list[dict[str, Any]], title: str = "") -> Table:
         """Create a formatted table from data"""
         if not data:
             # Return empty table with message
@@ -94,7 +94,7 @@ class DisplayFormatter:
 
     @staticmethod
     def create_info_panel(
-        title: str, content: Dict[str, Any], style: str = "blue"
+        title: str, content: dict[str, Any], style: str = "blue"
     ) -> Panel:
         """Create an information panel"""
         content_lines = []

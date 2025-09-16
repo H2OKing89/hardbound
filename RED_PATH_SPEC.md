@@ -216,36 +216,36 @@ def test_hyphen_preservation():
     t = parse_tokens(name, ".m4b")
     filename = build_filename(t)
     folder = build_folder_name(t)
-    
+
     # Both should have "Test Series - vol_05 - Long Subtitle" at the start
     assert filename.startswith("Test Series - vol_05 - Long Subtitle")
     assert folder.startswith("Test Series - vol_05 - Long Subtitle")
-    
+
 def test_deterministic_extension():
     """Test that extension selection follows deterministic priority"""
     import tempfile
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         test_dir = Path(tmpdir) / "Test {ASIN.B0TEST}"
         test_dir.mkdir()
-        
+
         # Create files in reverse priority order
         (test_dir / "book.flac").touch()
         (test_dir / "book.mp3").touch()
         (test_dir / "book.m4a").touch()
         (test_dir / "book.m4b").touch()
-        
+
         dst_dir, dst_file = build_dst_paths(test_dir, Path("/dest"))
         assert dst_file.suffix == ".m4b"  # Highest priority wins
 
 def test_torrent_path_measurement():
     """Test that we measure torrent paths, not OS paths"""
     from hardbound.red_paths import _torrent_path_length
-    
+
     # OS path should be irrelevant
     folder = "Short"
     filename = "short.m4b"
-    
+
     # Only the folder/filename matters
     expected = len(folder) + 1 + len(filename)  # +1 for "/"
     actual = _torrent_path_length(folder, filename)
@@ -255,7 +255,7 @@ def test_torrent_path_measurement():
 def test_volume_normalization():
     """Test various volume formats normalize to vol_XX"""
     from hardbound.red_paths import normalize_volume
-    
+
     assert normalize_volume("vol_13") == "vol_13"
     assert normalize_volume("vol.13") == "vol_13"
     assert normalize_volume("vol 13") == "vol_13"
@@ -263,7 +263,7 @@ def test_volume_normalization():
     assert normalize_volume("v.13") == "vol_13"
     assert normalize_volume("v13") == "vol_13"
     assert normalize_volume("13") == "vol_13"
-    
+
     # Zero padding
     assert normalize_volume("vol_5") == "vol_05"
     assert normalize_volume("5") == "vol_05"
@@ -272,16 +272,16 @@ def test_path_cap_enforcement():
     """Test that paths never exceed the cap"""
     # Create a very long name that would exceed 180 chars
     long_name = f"{'Very ' * 20}Long Title - vol_01 - {'Super ' * 10}Long Subtitle (2024) (Very Long Author Name) {{ASIN.B0VERYLONGASIN}}"
-    
+
     src = Path(f"/src/{long_name}")
     dst_root = Path("/dst")
-    
+
     dst_dir, dst_file = build_dst_paths(src, dst_root, ".m4b")
-    
+
     # Must fit within cap
     from hardbound.red_paths import _fits_red_cap
     assert _fits_red_cap(dst_dir.name, dst_file.name)
-    
+
     # Must still have required elements
     assert "{ASIN." in dst_dir.name
     assert "{ASIN." in dst_file.name
@@ -319,7 +319,7 @@ def main():
         file_name = dst_file.name
         torrent_length = _torrent_path_length(folder_name, file_name)
         is_valid = validate_path_length(dst_dir, file_name)
-        
+
         if args.json:
             result = {
                 "src": str(args.src_dir),
@@ -339,7 +339,7 @@ def main():
             print(f"→ Path:   {folder_name}/{file_name}")
             print(f"→ Length: {torrent_length} chars")
             print(f"→ Valid:  {is_valid} (≤ 180)")
-            
+
             if not is_valid:
                 print("⚠️  WARNING: Path exceeds 180 character limit!")
 
@@ -348,7 +348,7 @@ def main():
             dst_dir.mkdir(parents=True, exist_ok=True)
             print(f"Created directory: {dst_dir}")
             # Note: Actual hardlinking/copying would happen here in your pipeline
-            
+
     except Exception as e:
         if args.json:
             print(json.dumps({"error": str(e)}, indent=2))
@@ -542,7 +542,7 @@ from hardbound.red_paths import parse_tokens
 tokens = parse_tokens("Your Book Name Here {ASIN.B0TEST}", ".m4b")
 print(f"Parsed: {tokens}")
 
-# Test length calculation  
+# Test length calculation
 from hardbound.red_paths import _torrent_path_length, _fits_red_cap
 length = _torrent_path_length("folder", "file.m4b")
 fits = _fits_red_cap("folder", "file.m4b")

@@ -3,6 +3,7 @@
 Structured logging with Rich console output and JSON file logging
 Provides context binding for ASIN, title, volume, and job tracking
 """
+
 from __future__ import annotations
 
 import json
@@ -10,7 +11,6 @@ import logging
 from logging import Logger
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
-from typing import Optional
 
 import structlog
 from structlog.contextvars import (
@@ -33,7 +33,7 @@ except ImportError:
 # ---- public helpers ---------------------------------------------------------
 
 
-def get_logger(name: Optional[str] = None) -> structlog.stdlib.BoundLogger:
+def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     """
     Get a structlog logger bound to the app. Use .bind(asin="…") to add context.
 
@@ -211,9 +211,7 @@ def bind_audiobook_context(asin: str, title: str, volume: str, **extra) -> None:
     bind_contextvars(**context)
 
 
-def bind_operation_context(
-    operation: str, job_id: Optional[str] = None, **extra
-) -> None:
+def bind_operation_context(operation: str, job_id: str | None = None, **extra) -> None:
     """
     Convenience function to bind operation context.
 

@@ -2,7 +2,6 @@
 
 import re
 import unicodedata
-from typing import Callable, Dict, Optional
 
 from rich import box
 from rich.console import Console
@@ -16,12 +15,12 @@ class MenuSystem:
     """Standardized menu system with Rich for perfect Unicode display"""
 
     def __init__(self):
-        self.menus: Dict[str, Dict] = {}
-        self.current_menu: Optional[str] = None
+        self.menus: dict[str, dict] = {}
+        self.current_menu: str | None = None
         self.console = Console()
 
     def add_menu(
-        self, name: str, title: str, options: Dict[str, tuple], width: int = 50
+        self, name: str, title: str, options: dict[str, tuple], width: int = 50
     ):
         """Add a menu with options
 
@@ -33,7 +32,7 @@ class MenuSystem:
         """
         self.menus[name] = {"title": title, "options": options, "width": width}
 
-    def display_menu(self, name: str) -> Optional[str]:
+    def display_menu(self, name: str) -> str | None:
         """Display a menu using Rich for perfect alignment
 
         Returns:
@@ -65,7 +64,7 @@ class MenuSystem:
         self.console.print(panel)
         return self._get_choice(list(menu["options"].keys()))
 
-    def _get_choice(self, valid_choices: list) -> Optional[str]:
+    def _get_choice(self, valid_choices: list) -> str | None:
         """Get and validate user choice"""
         while True:
             try:

@@ -1,7 +1,5 @@
 """Progress indicators and spinners for long-running operations"""
 
-from typing import Callable, Optional, Union
-
 from rich.console import Console
 from rich.progress import (
     BarColumn,
@@ -44,7 +42,7 @@ class ProgressManager:
         )
 
     def start_task(
-        self, progress: Progress, description: str, total: Optional[int] = None
+        self, progress: Progress, description: str, total: int | None = None
     ) -> TaskID:
         """Start a progress task"""
         if total is not None:
@@ -57,7 +55,7 @@ class ProgressManager:
         progress: Progress,
         task_id: TaskID,
         advance: int = 1,
-        description: Optional[str] = None,
+        description: str | None = None,
     ):
         """Update progress task"""
         progress.update(task_id, advance=advance, description=description)

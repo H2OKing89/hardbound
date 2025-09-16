@@ -6,14 +6,13 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Dict, Optional
 
 from rich.console import Console
 
 from .config import ConfigManager
 from .display import Sty, row
 from .red_paths import build_dst_paths, parse_tokens
-from .utils.logging import bind_operation_context, get_logger
+from .utils.logging import get_logger
 from .utils.timing import log_step
 
 # Global console instance
@@ -108,14 +107,13 @@ def set_file_permissions_and_ownership(file_path: Path):
                     uid=uid,
                     gid=gid,
                 )
-            except (KeyError, OSError) as e:
+            except (KeyError, OSError, ValueError) as e:
                 logger.error(
                     "ownership.file_failed",
                     error=str(e),
                     user=owner_user,
                     group=owner_group,
                 )
-            except (OSError, KeyError, ValueError) as e:
                 console.print(f"[yellow]⚠️  Ownership setting failed: {e}[/yellow]")
 
 
@@ -418,7 +416,6 @@ def plan_and_link_red(
     dst_dir, dst_file = build_dst_paths(src_dir, dst_root)
 
     # Extract ASIN from source for validation
-    from .red_paths import parse_tokens
 
     tokens = parse_tokens(src_dir.name, dst_file.suffix)
     asin = tokens.asin
@@ -519,7 +516,6 @@ def plan_and_link(
 
         if ext == ".cue":
             dst = outputs["cue"]
-            kind = "cue"
         elif ext in AUDIO_EXTS:
             if ext == ".m4b":
                 dst = outputs["m4b"]
@@ -531,10 +527,8 @@ def plan_and_link(
                 dst = dst_dir / f"{base_name}.m4a"
             else:
                 continue
-            kind = "audio"
         elif ext in IMG_EXTS:
             dst = outputs["jpg"]  # canonical .jpg name regardless of source img ext
-            kind = "image"
         elif ext in DOC_EXTS:
             if ext == ".pdf":
                 dst = outputs["pdf"]
@@ -544,7 +538,6 @@ def plan_and_link(
                 dst = outputs["nfo"]
             else:
                 continue
-            kind = "doc"
         else:
             continue
 
@@ -596,8 +589,8 @@ def preflight_checks(src: Path, dst: Path) -> bool:
     # Check same filesystem
     try:
         if src.stat().st_dev != dst.parent.stat().st_dev:
-            console.print(f"[red]❌ Cross-device link error[/red]")
-            console.print(f"   Source and destination must be on same filesystem")
+            console.print("[red]❌ Cross-device link error[/red]")
+            console.print("   Source and destination must be on same filesystem")
             console.print(f"   Source: {src}")
             console.print(f"   Dest:   {dst}")
             return False
@@ -609,8 +602,8 @@ def preflight_checks(src: Path, dst: Path) -> bool:
     if ("/mnt/user/" in src_str and "/mnt/disk" in dst_str) or (
         "/mnt/disk" in src_str and "/mnt/user/" in dst_str
     ):
-        console.print(f"[red]❌ Unraid user/disk mixing detected[/red]")
-        console.print(f"   Hardlinks won't work between /mnt/user and /mnt/disk paths")
+        console.print("[red]❌ Unraid user/disk mixing detected[/red]")
+        console.print("   Hardlinks won't work between /mnt/user and /mnt/disk paths")
         return False
 
     return True
@@ -618,7 +611,7 @@ def preflight_checks(src: Path, dst: Path) -> bool:
 
 def run_batch(batch_file: Path, also_cover, zero_pad, force, dry_run):
     """Process batch file with src|dst pairs"""
-    from .display import Sty, section
+    from .display import section
 
     logger = log.bind(
         batch_file=str(batch_file),
@@ -652,7 +645,7 @@ def run_batch(batch_file: Path, also_cover, zero_pad, force, dry_run):
                     continue
 
                 try:
-                    src_s, dst_s = [x.strip() for x in line.split("|", 1)]
+                    src_s, dst_s = (x.strip() for x in line.split("|", 1))
                     processed_count += 1
                 except ValueError:
                     logger.warning(

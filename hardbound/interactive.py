@@ -2,6 +2,7 @@
 """
 Interactive mode and wizard functionality
 """
+
 import copy
 import json
 import os
@@ -10,14 +11,13 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 from time import perf_counter
-from typing import Dict, List, Optional
 
 from rich.console import Console
 
 from .catalog import DB_FILE, AudiobookCatalog
 from .config import DEFAULT_CONFIG, ConfigManager, load_config, save_config
-from .display import Sty, summary_table
-from .linker import plan_and_link, plan_and_link_red, zero_pad_vol
+from .display import summary_table
+from .linker import plan_and_link_red
 from .ui.feedback import ErrorHandler, ProgressIndicator, VisualFeedback
 from .ui.menu import create_main_menu, create_quick_actions_menu, menu_system
 from .utils.logging import get_logger
@@ -36,7 +36,7 @@ def _get_recent_sources(config):
     return sources if isinstance(sources, list) else []
 
 
-def parse_selection_input(input_str: str, max_items: int) -> List[int]:
+def parse_selection_input(input_str: str, max_items: int) -> list[int]:
     """Parse selection input with support for ranges and comma-separated values.
 
     Examples:
@@ -77,17 +77,16 @@ def parse_selection_input(input_str: str, max_items: int) -> List[int]:
                 # Skip invalid numbers
                 continue
 
-    return sorted(list(indices))
+    return sorted(indices)
 
 
 def have_fzf() -> bool:
     """Check if fzf is available"""
-    import shutil
 
     return shutil.which("fzf") is not None
 
 
-def hierarchical_browser(catalog) -> List[str]:
+def hierarchical_browser(catalog) -> list[str]:
     """Browse audiobooks by author/series hierarchy"""
 
     # Get all unique authors from catalog
@@ -117,7 +116,7 @@ def hierarchical_browser(catalog) -> List[str]:
         author_to_books[author].append(item)
 
     console.print("[cyan]📚 BROWSE BY AUTHOR[/cyan]")
-    print(f"\nSelect first letter of author's name:\n")
+    print("\nSelect first letter of author's name:\n")
 
     # Show initials with counts
     initials = sorted(authors_by_initial.keys())
@@ -133,14 +132,14 @@ def hierarchical_browser(catalog) -> List[str]:
                 row.append("      ")
         console.print("  " + "  ".join(row))
 
-    console.print(f"\n[yellow]Enter letter(s), or 'search' for text search:[/yellow]")
+    console.print("\n[yellow]Enter letter(s), or 'search' for text search:[/yellow]")
     choice = input("Choice: ").strip().upper()
 
     if choice.lower() == "search":
         return enhanced_text_search_browser(catalog)
 
     if not choice or choice not in authors_by_initial:
-        console.print(f"[yellow]Invalid selection[/yellow]")
+        console.print("[yellow]Invalid selection[/yellow]")
         return []
 
     # Step 2: Choose author
@@ -185,7 +184,7 @@ def hierarchical_browser(catalog) -> List[str]:
                 selected_author = authors[idx]
                 break
         else:
-            console.print(f"[yellow]Invalid selection[/yellow]")
+            console.print("[yellow]Invalid selection[/yellow]")
 
     # Step 3: Browse author's books
     author_books = author_to_books[selected_author]
@@ -209,7 +208,7 @@ def hierarchical_browser(catalog) -> List[str]:
 
     # Show series first
     if series_groups:
-        console.print(f"\n[bold]Series:[/bold]")
+        console.print("\n[bold]Series:[/bold]")
         for series in sorted(series_groups.keys()):
             books = sorted(series_groups[series], key=lambda x: x.get("book", ""))
             console.print(f"\n  [magenta]{series}[/magenta] ({len(books)} books)")
@@ -224,7 +223,7 @@ def hierarchical_browser(catalog) -> List[str]:
 
     # Show standalone books
     if standalone:
-        console.print(f"\n[bold]Standalone:[/bold]")
+        console.print("\n[bold]Standalone:[/bold]")
         for book in sorted(standalone, key=lambda x: x.get("book", "")):
             all_selectable.append(book)
             idx = len(all_selectable)
@@ -235,12 +234,12 @@ def hierarchical_browser(catalog) -> List[str]:
             )
 
     # Selection
-    console.print(f"\n[cyan]🎯 Selection Instructions:[/cyan]")
-    console.print(f"  • Enter numbers separated by commas: [green]1,3,5[/green]")
-    console.print(f"  • Use ranges with dashes: [green]1-5,8,10-12[/green]")
-    console.print(f"  • Enter [green]all[/green] to select everything")
-    console.print(f"  • Press Enter without input to cancel")
-    console.print(f"\n[yellow]Selection (or 'q' to quit):[/yellow]")
+    console.print("\n[cyan]🎯 Selection Instructions:[/cyan]")
+    console.print("  • Enter numbers separated by commas: [green]1,3,5[/green]")
+    console.print("  • Use ranges with dashes: [green]1-5,8,10-12[/green]")
+    console.print("  • Enter [green]all[/green] to select everything")
+    console.print("  • Press Enter without input to cancel")
+    console.print("\n[yellow]Selection (or 'q' to quit):[/yellow]")
     choice = input("Choice: ").strip().lower()
 
     if choice == "q":
@@ -258,9 +257,9 @@ def hierarchical_browser(catalog) -> List[str]:
         return selected
 
 
-def enhanced_text_search_browser(catalog) -> List[str]:
+def enhanced_text_search_browser(catalog) -> list[str]:
     """Enhanced text search browser with autocomplete and history"""
-    console.print(f"\n[cyan]🔍 ENHANCED TEXT SEARCH[/cyan]")
+    console.print("\n[cyan]🔍 ENHANCED TEXT SEARCH[/cyan]")
 
     # Load search history
     history_file = Path.home() / ".cache" / "hardbound" / "search_history.txt"
@@ -269,7 +268,7 @@ def enhanced_text_search_browser(catalog) -> List[str]:
     search_history = []
     if history_file.exists():
         try:
-            with open(history_file, "r", encoding="utf-8") as f:
+            with open(history_file, encoding="utf-8") as f:
                 search_history = [
                     line.strip() for line in f.readlines() if line.strip()
                 ]
@@ -280,8 +279,8 @@ def enhanced_text_search_browser(catalog) -> List[str]:
     autocomplete_suggestions = _get_autocomplete_suggestions(catalog)
 
     print("\nEnter search terms (author, title, series):")
-    console.print(f"[dim]💡 Type a few letters and press Tab for suggestions[/dim]")
-    console.print(f"[dim]💡 Press ↑/↓ for search history[/dim]")
+    console.print("[dim]💡 Type a few letters and press Tab for suggestions[/dim]")
+    console.print("[dim]💡 Press ↑/↓ for search history[/dim]")
 
     query = _enhanced_input("Search: ", autocomplete_suggestions, search_history)
 
@@ -301,8 +300,8 @@ def enhanced_text_search_browser(catalog) -> List[str]:
     results = catalog.search(query, limit=100)
 
     if not results:
-        console.print(f"[yellow]No results found[/yellow]")
-        console.print(f"[dim]💡 Try different keywords or check spelling[/dim]")
+        console.print("[yellow]No results found[/yellow]")
+        console.print("[dim]💡 Try different keywords or check spelling[/dim]")
         return []
 
     console.print(f"\n[green]Found {len(results)} result(s):[/green]\n")
@@ -363,7 +362,7 @@ def enhanced_text_search_browser(catalog) -> List[str]:
                 return selected
 
 
-def _get_autocomplete_suggestions(catalog) -> List[str]:
+def _get_autocomplete_suggestions(catalog) -> list[str]:
     """Get autocomplete suggestions from catalog"""
     suggestions = set()
 
@@ -420,10 +419,10 @@ def _get_autocomplete_suggestions(catalog) -> List[str]:
         except Exception:
             pass  # Ignore errors
 
-    return sorted(list(suggestions))
+    return sorted(suggestions)
 
 
-def _enhanced_input(prompt: str, autocomplete: List[str], history: List[str]) -> str:
+def _enhanced_input(prompt: str, autocomplete: list[str], history: list[str]) -> str:
     """Enhanced input with basic autocomplete and history"""
     print(prompt, end="", flush=True)
 
@@ -438,7 +437,7 @@ def _enhanced_input(prompt: str, autocomplete: List[str], history: List[str]) ->
 
 
 # Update fzf_pick to use hierarchical browser when fzf is not available
-def fzf_pick(candidates: List[Dict], multi: bool = True) -> List[str]:
+def fzf_pick(candidates: list[dict], multi: bool = True) -> list[str]:
     """
     Use fzf for interactive fuzzy selection with preview
     Falls back to hierarchical browser when fzf is not available
@@ -448,7 +447,7 @@ def fzf_pick(candidates: List[Dict], multi: bool = True) -> List[str]:
 
     if not have_fzf():
         # Use hierarchical browser instead of simple fallback
-        console.print(f"[yellow]fzf not found. Using hierarchical browser.[/yellow]")
+        console.print("[yellow]fzf not found. Using hierarchical browser.[/yellow]")
 
         # Create a temporary catalog-like interface
         class TempCatalog:
@@ -557,12 +556,12 @@ def fzf_pick(candidates: List[Dict], multi: bool = True) -> List[str]:
         return fallback_picker(candidates, multi)
 
 
-def fallback_picker(candidates: List[Dict], multi: bool) -> List[str]:
+def fallback_picker(candidates: list[dict], multi: bool) -> list[str]:
     """Fallback picker when fzf is not available"""
     if not candidates:
         return []
 
-    console.print(f"\n[cyan]Select audiobook(s):[/cyan]")
+    console.print("\n[cyan]Select audiobook(s):[/cyan]")
     for i, r in enumerate(candidates[:30], 1):
         author = r.get("author", "—")
         book = r.get("book", "—")
@@ -573,11 +572,11 @@ def fallback_picker(candidates: List[Dict], multi: bool) -> List[str]:
         print(f"... and {len(candidates) - 30} more")
 
     if multi:
-        console.print(f"\n[cyan]🎯 Selection Instructions:[/cyan]")
-        console.print(f"  • Enter numbers separated by commas: [green]1,3,5[/green]")
-        console.print(f"  • Use ranges with dashes: [green]1-5,8,10-12[/green]")
-        console.print(f"  • Enter [green]all[/green] to select everything")
-        console.print(f"  • Press Enter without input to cancel")
+        console.print("\n[cyan]🎯 Selection Instructions:[/cyan]")
+        console.print("  • Enter numbers separated by commas: [green]1,3,5[/green]")
+        console.print("  • Use ranges with dashes: [green]1-5,8,10-12[/green]")
+        console.print("  • Enter [green]all[/green] to select everything")
+        console.print("  • Press Enter without input to cancel")
         choice = input("\nSelection: ").strip()
 
         if choice.lower() == "all":
@@ -669,7 +668,7 @@ def _first_run_setup(config):
     # Library path setup
     library_path = None
     while not library_path:
-        console.print(f"[cyan]➤[/cyan] Audiobook library path: ", end="")
+        console.print("[cyan]➤[/cyan] Audiobook library path: ", end="")
         path_str = input().strip()
         if not path_str:
             # Try to auto-detect
@@ -694,7 +693,7 @@ def _first_run_setup(config):
     # Destination path setup
     dest_path = None
     while not dest_path:
-        console.print(f"[cyan]➤[/cyan] Torrent destination root: ", end="")
+        console.print("[cyan]➤[/cyan] Torrent destination root: ", end="")
         path_str = input().strip()
         if not path_str:
             feedback = VisualFeedback()
@@ -719,17 +718,17 @@ def _first_run_setup(config):
 
 def search_and_link_wizard():
     """Search-first linking wizard with hierarchical browsing"""
-    console.print(f"\n[cyan]🔍 SEARCH AND LINK[/cyan]")
+    console.print("\n[cyan]🔍 SEARCH AND LINK[/cyan]")
 
     catalog = AudiobookCatalog()
 
     # Offer choice of browse vs search
     print("\nHow would you like to find audiobooks?")
     console.print(
-        f"  [green]1[/green]) Browse by author (recommended for large libraries)"
+        "  [green]1[/green]) Browse by author (recommended for large libraries)"
     )
-    console.print(f"  [green]2[/green]) Search by text")
-    console.print(f"  [green]3[/green]) Show recent audiobooks")
+    console.print("  [green]2[/green]) Search by text")
+    console.print("  [green]3[/green]) Show recent audiobooks")
 
     choice = input("\nChoice (1-3): ").strip()
 
@@ -740,10 +739,10 @@ def search_and_link_wizard():
     elif choice == "3":
         results = catalog.search("*", limit=50)
         if results:
-            console.print(f"\n[green]Recent audiobooks:[/green]")
+            console.print("\n[green]Recent audiobooks:[/green]")
             selected_paths = enhanced_text_search_browser(catalog)
         else:
-            console.print(f"[yellow]No audiobooks found[/yellow]")
+            console.print("[yellow]No audiobooks found[/yellow]")
             selected_paths = []
     else:
         catalog.close()
@@ -763,7 +762,7 @@ def search_and_link_wizard():
 
     if not enabled_integrations:
         console.print(
-            f"[yellow]⚠️  No integrations are enabled. Please configure at least one integration.[/yellow]"
+            "[yellow]⚠️  No integrations are enabled. Please configure at least one integration.[/yellow]"
         )
         catalog.close()
         return
@@ -774,7 +773,7 @@ def search_and_link_wizard():
         selected_integration = list(enabled_integrations.keys())[0]
         console.print(f"[cyan]Using {selected_integration} integration[/cyan]")
     else:
-        console.print(f"\n[bold]Select integration:[/bold]")
+        console.print("\n[bold]Select integration:[/bold]")
         for i, (name, config_data) in enumerate(enabled_integrations.items(), 1):
             path_limit = config_data.get("path_limit")
             limit_str = f" (limit: {path_limit} chars)" if path_limit else ""
@@ -788,11 +787,11 @@ def search_and_link_wizard():
             if 0 <= idx < len(enabled_integrations):
                 selected_integration = list(enabled_integrations.keys())[idx]
             else:
-                console.print(f"[red]Invalid choice[/red]")
+                console.print("[red]Invalid choice[/red]")
                 catalog.close()
                 return
         except ValueError:
-            console.print(f"[red]Invalid choice[/red]")
+            console.print("[red]Invalid choice[/red]")
             catalog.close()
             return
 
@@ -855,14 +854,14 @@ def search_and_link_wizard():
 
 def update_catalog_wizard():
     """Wizard for updating the catalog"""
-    console.print(f"\n[cyan]📚 UPDATE CATALOG WIZARD[/cyan]")
+    console.print("\n[cyan]📚 UPDATE CATALOG WIZARD[/cyan]")
 
     catalog = AudiobookCatalog()
 
     # Step 1: Choose update method
-    console.print(f"\n[bold]Choose update method:[/bold]")
-    console.print(f"  [green]1[/green]) Update from library path (recommended)")
-    console.print(f"  [green]2[/green]) Manual directory selection")
+    console.print("\n[bold]Choose update method:[/bold]")
+    console.print("  [green]1[/green]) Update from library path (recommended)")
+    console.print("  [green]2[/green]) Manual directory selection")
 
     choice = input("Choice (1-2): ").strip()
 
@@ -895,14 +894,14 @@ def update_catalog_wizard():
         else:
             console.print(f"[red]❌ Invalid directory: {root}[/red]")
     else:
-        console.print(f"[yellow]Invalid selection[/yellow]")
+        console.print("[yellow]Invalid selection[/yellow]")
 
     catalog.close()
 
 
 def recent_downloads_scanner():
     """Find and link recently downloaded audiobooks"""
-    console.print(f"\n[cyan]🔍 RECENT DOWNLOADS SCANNER[/cyan]")
+    console.print("\n[cyan]🔍 RECENT DOWNLOADS SCANNER[/cyan]")
 
     # Check if catalog exists
     if DB_FILE.exists():
@@ -922,15 +921,15 @@ def recent_downloads_scanner():
 
     # Fallback to filesystem scan
     hours = input(
-        f"\nScan for audiobooks modified in last N hours (default 24): "
+        "\nScan for audiobooks modified in last N hours (default 24): "
     ).strip()
     hours = int(hours) if hours.isdigit() else 24
 
-    console.print(f"\n[yellow]Scanning filesystem...[/yellow]")
+    console.print("\n[yellow]Scanning filesystem...[/yellow]")
     recent = find_recent_audiobooks(hours=hours)
 
     if not recent:
-        console.print(f"[yellow]No recent audiobooks found[/yellow]")
+        console.print("[yellow]No recent audiobooks found[/yellow]")
         return
 
     # Convert to dict format for picker
@@ -953,35 +952,35 @@ def recent_downloads_scanner():
 def folder_batch_wizard():
     """Legacy folder batch wizard - kept for compatibility"""
     console.print(
-        f"\n[yellow]Note: For large libraries, use 'Search and link' instead[/yellow]"
+        "\n[yellow]Note: For large libraries, use 'Search and link' instead[/yellow]"
     )
-    console.print(f"[cyan]📁 FOLDER BATCH LINKER (Legacy)[/cyan]")
+    console.print("[cyan]📁 FOLDER BATCH LINKER (Legacy)[/cyan]")
 
     config = load_config()
 
     # Use directory browser
-    console.print(f"\n[bold]Choose folder containing audiobooks:[/bold]")
+    console.print("\n[bold]Choose folder containing audiobooks:[/bold]")
     src_folder = browse_directory_tree()
     if not src_folder:
         return
 
     # Find audiobook subdirectories
     audiobook_dirs = []
-    console.print(f"\n[yellow]Scanning for audiobooks...[/yellow]")
+    console.print("\n[yellow]Scanning for audiobooks...[/yellow]")
 
     try:
         for item in src_folder.iterdir():
             if item.is_dir() and (any(item.glob("*.m4b")) or any(item.glob("*.mp3"))):
                 audiobook_dirs.append(item)
     except PermissionError:
-        console.print(f"[red]❌ Permission denied[/red]")
+        console.print("[red]❌ Permission denied[/red]")
         return
 
     if not audiobook_dirs:
         if any(src_folder.glob("*.m4b")) or any(src_folder.glob("*.mp3")):
             audiobook_dirs = [src_folder]
         else:
-            console.print(f"[red]No audiobooks found[/red]")
+            console.print("[red]No audiobooks found[/red]")
             return
 
     console.print(f"\n[green]Found {len(audiobook_dirs)} audiobook(s)[/green]")
@@ -990,7 +989,7 @@ def folder_batch_wizard():
     default_dst = config.get("torrent_path", "")
     if default_dst:
         print(f"Destination: {default_dst}")
-        dst_input = input(f"Destination root (Enter for default): ").strip()
+        dst_input = input("Destination root (Enter for default): ").strip()
         dst_root = Path(dst_input) if dst_input else Path(str(default_dst))
     else:
         dst_input = input("Destination root: ").strip()
@@ -1022,11 +1021,11 @@ def maintenance_menu():
     """Database maintenance and management menu"""
     from .catalog import AudiobookCatalog
 
-    console.print(f"\n[cyan]🛠️ DATABASE MAINTENANCE[/cyan]")
+    console.print("\n[cyan]🛠️ DATABASE MAINTENANCE[/cyan]")
 
     while True:
         console.print(
-            f"""
+            """
 [yellow]Database maintenance options:[/yellow]
 
 [green]1[/green]) 🧹 Clean orphaned entries
@@ -1045,16 +1044,16 @@ def maintenance_menu():
 
         try:
             if choice == "1":
-                console.print(f"\n[cyan]🧹 Cleaning orphaned entries...[/cyan]")
+                console.print("\n[cyan]🧹 Cleaning orphaned entries...[/cyan]")
                 result = catalog.clean_orphaned_entries(True)
                 console.print(
                     f"[green]✅ Cleaned {result['removed']} orphaned entries[/green]"
                 )
 
             elif choice == "2":
-                console.print(f"\n[cyan]📊 Database Statistics:[/cyan]")
+                console.print("\n[cyan]📊 Database Statistics:[/cyan]")
                 db_stats = catalog.get_db_stats()
-                idx_stats = catalog.get_index_stats()
+                catalog.get_index_stats()  # Just call for side effects
 
                 console.print(
                     f"  Database size: {db_stats.get('db_size', 0) / (1024*1024):.1f} MB"
@@ -1064,32 +1063,30 @@ def maintenance_menu():
                 console.print(f"  Indexes: {len(db_stats.get('indexes', []))}")
 
                 if db_stats.get("fts_integrity") is False:
-                    console.print(
-                        f"[yellow]  ⚠️  FTS integrity issues detected[/yellow]"
-                    )
+                    console.print("[yellow]  ⚠️  FTS integrity issues detected[/yellow]")
 
             elif choice == "3":
-                console.print(f"\n[cyan]⚡ Optimizing database...[/cyan]")
+                console.print("\n[cyan]⚡ Optimizing database...[/cyan]")
                 result = catalog.optimize_database(True)
-                console.print(f"[green]✅ Database optimized[/green]")
+                console.print("[green]✅ Database optimized[/green]")
                 console.print(
                     f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB"
                 )
                 console.print(f"  Time taken: {result['elapsed']:.2f}s")
 
             elif choice == "4":
-                console.print(f"\n[cyan]🧽 Vacuuming database...[/cyan]")
+                console.print("\n[cyan]🧽 Vacuuming database...[/cyan]")
                 result = catalog.vacuum_database(True)
-                console.print(f"[green]✅ Database vacuumed[/green]")
+                console.print("[green]✅ Database vacuumed[/green]")
                 console.print(
                     f"  Space saved: {result['space_saved'] / (1024*1024):.1f} MB"
                 )
 
             elif choice == "5":
-                console.print(f"\n[cyan]🔍 Verifying database integrity...[/cyan]")
+                console.print("\n[cyan]🔍 Verifying database integrity...[/cyan]")
                 result = catalog.verify_integrity(True)
 
-                console.print(f"[cyan]Integrity Check Results:[/cyan]")
+                console.print("[cyan]Integrity Check Results:[/cyan]")
                 console.print(
                     f"  SQLite integrity: {'✅ OK' if result['sqlite_integrity'] else '❌ FAILED'}"
                 )
@@ -1101,20 +1098,20 @@ def maintenance_menu():
 
                 if not all(v is not False for v in result.values() if v is not None):
                     console.print(
-                        f"[yellow]⚠️  Issues found - consider running 'optimize'[/yellow]"
+                        "[yellow]⚠️  Issues found - consider running 'optimize'[/yellow]"
                     )
 
             elif choice == "6":
-                console.print(f"\n[cyan]🔄 Rebuilding indexes...[/cyan]")
+                console.print("\n[cyan]🔄 Rebuilding indexes...[/cyan]")
                 result = catalog.rebuild_indexes(True)
-                console.print(f"[green]✅ Indexes rebuilt successfully[/green]")
+                console.print("[green]✅ Indexes rebuilt successfully[/green]")
 
             elif choice == "7" or choice.lower() in ["q", "quit", "back"]:
                 catalog.close()
                 break
 
             else:
-                console.print(f"[yellow]Invalid choice. Please enter 1-7.[/yellow]")
+                console.print("[yellow]Invalid choice. Please enter 1-7.[/yellow]")
                 catalog.close()
                 continue
 
@@ -1123,17 +1120,17 @@ def maintenance_menu():
         finally:
             catalog.close()
 
-        console.print(f"\n[yellow]Press Enter to continue...[/yellow]")
+        console.print("\n[yellow]Press Enter to continue...[/yellow]")
         input()
 
 
 def configure_permissions_wizard(config):
     """Configure file permissions with helpful defaults and explanations"""
-    console.print(f"\n[cyan]📋 FILE PERMISSIONS SETUP[/cyan]")
+    console.print("\n[cyan]📋 FILE PERMISSIONS SETUP[/cyan]")
     console.print(
-        f"""
+        """
 [yellow]About file permissions:[/yellow]
-File permissions control who can read, write, and execute files. 
+File permissions control who can read, write, and execute files.
 They're represented as 3-digit octal numbers (e.g., 644, 755).
 
 [dim]Common permission values:[/dim]
@@ -1152,7 +1149,7 @@ They're represented as 3-digit octal numbers (e.g., 644, 755).
             f"[yellow]Current setting: ✅ Enabled - {oct(current_perms)} ({oct(current_perms)[-3:]})[/yellow]"
         )
     else:
-        console.print(f"[yellow]Current setting: ❌ Disabled[/yellow]")
+        console.print("[yellow]Current setting: ❌ Disabled[/yellow]")
 
     # Enable/disable
     enable_choice = (
@@ -1162,36 +1159,34 @@ They're represented as 3-digit octal numbers (e.g., 644, 755).
     if enable_choice in ["y", "yes"]:
         config["set_permissions"] = True
 
-        console.print(f"\n[green]Choose permission mode:[/green]")
+        console.print("\n[green]Choose permission mode:[/green]")
         console.print(
-            f"  1) 644 (rw-r--r--) - Standard file permissions [green](recommended)[/green]"
+            "  1) 644 (rw-r--r--) - Standard file permissions [green](recommended)[/green]"
         )
-        console.print(f"  2) 666 (rw-rw-rw-) - Everyone can read/write")
-        console.print(f"  3) 755 (rwxr-xr-x) - Executable files")
-        console.print(f"  4) 600 (rw-------) - Owner-only access (secure)")
-        console.print(f"  5) Custom (enter octal number)")
+        console.print("  2) 666 (rw-rw-rw-) - Everyone can read/write")
+        console.print("  3) 755 (rwxr-xr-x) - Executable files")
+        console.print("  4) 600 (rw-------) - Owner-only access (secure)")
+        console.print("  5) Custom (enter octal number)")
 
         perm_choice = input("\nSelect permission mode (1-5): ").strip()
 
         if perm_choice == "1":
             config["file_permissions"] = 0o644
             console.print(
-                f"[green]✅ Set to 644 (rw-r--r--) - Standard file permissions[/green]"
+                "[green]✅ Set to 644 (rw-r--r--) - Standard file permissions[/green]"
             )
         elif perm_choice == "2":
             config["file_permissions"] = 0o666
             console.print(
-                f"[green]✅ Set to 666 (rw-rw-rw-) - Everyone can read/write[/green]"
+                "[green]✅ Set to 666 (rw-rw-rw-) - Everyone can read/write[/green]"
             )
         elif perm_choice == "3":
             config["file_permissions"] = 0o755
-            console.print(
-                f"[green]✅ Set to 755 (rwxr-xr-x) - Executable files[/green]"
-            )
+            console.print("[green]✅ Set to 755 (rwxr-xr-x) - Executable files[/green]")
         elif perm_choice == "4":
             config["file_permissions"] = 0o600
             console.print(
-                f"[green]✅ Set to 600 (rw-------) - Owner-only access[/green]"
+                "[green]✅ Set to 600 (rw-------) - Owner-only access[/green]"
             )
         elif perm_choice == "5":
             custom_perm = input("Enter octal permission (e.g. 644): ").strip()
@@ -1207,28 +1202,28 @@ They're represented as 3-digit octal numbers (e.g., 644, 755).
                     )
                 else:
                     console.print(
-                        f"[red]Invalid permission value. Keeping current setting.[/red]"
+                        "[red]Invalid permission value. Keeping current setting.[/red]"
                     )
             except ValueError:
                 console.print(
-                    f"[red]Invalid octal number. Keeping current setting.[/red]"
+                    "[red]Invalid octal number. Keeping current setting.[/red]"
                 )
         else:
             console.print(
-                f"[yellow]Invalid choice. Keeping current permission.[/yellow]"
+                "[yellow]Invalid choice. Keeping current permission.[/yellow]"
             )
     else:
         config["set_permissions"] = False
-        console.print(f"[yellow]❌ File permission setting disabled[/yellow]")
+        console.print("[yellow]❌ File permission setting disabled[/yellow]")
 
 
 def configure_dir_permissions_wizard(config):
     """Configure directory permissions with helpful defaults and explanations"""
-    console.print(f"\n[cyan]📁 DIRECTORY PERMISSIONS SETUP[/cyan]")
+    console.print("\n[cyan]📁 DIRECTORY PERMISSIONS SETUP[/cyan]")
     console.print(
-        f"""
+        """
 [yellow]About directory permissions:[/yellow]
-Directory permissions control who can access and list directory contents. 
+Directory permissions control who can access and list directory contents.
 They're represented as 3-digit octal numbers (e.g., 755, 775).
 
 [dim]Common permission values for directories:[/dim]
@@ -1249,7 +1244,7 @@ They're represented as 3-digit octal numbers (e.g., 755, 775).
             f"[yellow]Current setting: ✅ Enabled - {oct(current_perms)} ({oct(current_perms)[-3:]})[/yellow]"
         )
     else:
-        console.print(f"[yellow]Current setting: ❌ Disabled[/yellow]")
+        console.print("[yellow]Current setting: ❌ Disabled[/yellow]")
 
     # Enable/disable
     enable_choice = (
@@ -1261,30 +1256,30 @@ They're represented as 3-digit octal numbers (e.g., 755, 775).
     if enable_choice in ["y", "yes"]:
         config["set_dir_permissions"] = True
 
-        console.print(f"\n[green]Choose permission mode:[/green]")
+        console.print("\n[green]Choose permission mode:[/green]")
         console.print(
-            f"  1) 755 (rwxr-xr-x) - Standard directory permissions [green](recommended)[/green]"
+            "  1) 755 (rwxr-xr-x) - Standard directory permissions [green](recommended)[/green]"
         )
-        console.print(f"  2) 775 (rwxrwxr-x) - Group write access")
-        console.print(f"  3) 700 (rwx------) - Owner-only access (secure)")
-        console.print(f"  4) Custom (enter octal number)")
+        console.print("  2) 775 (rwxrwxr-x) - Group write access")
+        console.print("  3) 700 (rwx------) - Owner-only access (secure)")
+        console.print("  4) Custom (enter octal number)")
 
         perm_choice = input("\nSelect permission mode (1-4): ").strip()
 
         if perm_choice == "1":
             config["dir_permissions"] = 0o755
             console.print(
-                f"[green]✅ Set to 755 (rwxr-xr-x) - Standard directory permissions[/green]"
+                "[green]✅ Set to 755 (rwxr-xr-x) - Standard directory permissions[/green]"
             )
         elif perm_choice == "2":
             config["dir_permissions"] = 0o775
             console.print(
-                f"[green]✅ Set to 775 (rwxrwxr-x) - Group write access[/green]"
+                "[green]✅ Set to 775 (rwxrwxr-x) - Group write access[/green]"
             )
         elif perm_choice == "3":
             config["dir_permissions"] = 0o700
             console.print(
-                f"[green]✅ Set to 700 (rwx------) - Owner-only access[/green]"
+                "[green]✅ Set to 700 (rwx------) - Owner-only access[/green]"
             )
         elif perm_choice == "4":
             custom_perm = input("Enter octal permission (e.g. 755): ").strip()
@@ -1300,26 +1295,26 @@ They're represented as 3-digit octal numbers (e.g., 755, 775).
                     )
                 else:
                     console.print(
-                        f"[red]Invalid permission value. Keeping current setting.[/red]"
+                        "[red]Invalid permission value. Keeping current setting.[/red]"
                     )
             except ValueError:
                 console.print(
-                    f"[red]Invalid octal number. Keeping current setting.[/red]"
+                    "[red]Invalid octal number. Keeping current setting.[/red]"
                 )
         else:
             console.print(
-                f"[yellow]Invalid choice. Keeping current permission.[/yellow]"
+                "[yellow]Invalid choice. Keeping current permission.[/yellow]"
             )
     else:
         config["set_dir_permissions"] = False
-        console.print(f"[yellow]❌ Directory permission setting disabled[/yellow]")
+        console.print("[yellow]❌ Directory permission setting disabled[/yellow]")
 
 
 def configure_ownership_wizard(config):
     """Configure file ownership with helpful defaults and explanations"""
-    console.print(f"\n[cyan]👤 FILE OWNERSHIP SETUP[/cyan]")
+    console.print("\n[cyan]👤 FILE OWNERSHIP SETUP[/cyan]")
     console.print(
-        f"""
+        """
 [yellow]About file ownership:[/yellow]
 File ownership determines which user and group own the files.
 You can use either numeric IDs or names.
@@ -1343,7 +1338,7 @@ You can use either numeric IDs or names.
             f"[yellow]Current setting: ✅ Enabled - {current_user}:{current_group}[/yellow]"
         )
     else:
-        console.print(f"[yellow]Current setting: ❌ Disabled[/yellow]")
+        console.print("[yellow]Current setting: ❌ Disabled[/yellow]")
 
     # Enable/disable
     enable_choice = (
@@ -1353,29 +1348,29 @@ You can use either numeric IDs or names.
     if enable_choice in ["y", "yes"]:
         config["set_ownership"] = True
 
-        console.print(f"\n[green]Choose ownership setup:[/green]")
+        console.print("\n[green]Choose ownership setup:[/green]")
         console.print(
-            f"  1) Docker user (1000:1000) [green](common Docker setup)[/green]"
+            "  1) Docker user (1000:1000) [green](common Docker setup)[/green]"
         )
-        console.print(f"  2) Nobody user (99:100) [green](common for services)[/green]")
-        console.print(f"  3) Plex user (plex:plex)")
-        console.print(f"  4) Custom numeric IDs")
-        console.print(f"  5) Custom usernames")
+        console.print("  2) Nobody user (99:100) [green](common for services)[/green]")
+        console.print("  3) Plex user (plex:plex)")
+        console.print("  4) Custom numeric IDs")
+        console.print("  5) Custom usernames")
 
         owner_choice = input("\nSelect ownership setup (1-5): ").strip()
 
         if owner_choice == "1":
             config["owner_user"] = "1000"
             config["owner_group"] = "1000"
-            console.print(f"[green]✅ Set to 1000:1000 (Docker user)[/green]")
+            console.print("[green]✅ Set to 1000:1000 (Docker user)[/green]")
         elif owner_choice == "2":
             config["owner_user"] = "99"
             config["owner_group"] = "100"
-            console.print(f"[green]✅ Set to 99:100 (nobody:users)[/green]")
+            console.print("[green]✅ Set to 99:100 (nobody:users)[/green]")
         elif owner_choice == "3":
             config["owner_user"] = "plex"
             config["owner_group"] = "plex"
-            console.print(f"[green]✅ Set to plex:plex[/green]")
+            console.print("[green]✅ Set to plex:plex[/green]")
         elif owner_choice == "4":
             user_id = input("Enter numeric user ID (e.g. 99): ").strip()
             group_id = input("Enter numeric group ID (e.g. 100): ").strip()
@@ -1385,7 +1380,7 @@ You can use either numeric IDs or names.
                 console.print(f"[green]✅ Set to {user_id}:{group_id}[/green]")
             else:
                 console.print(
-                    f"[red]Invalid numeric IDs. Keeping current setting.[/red]"
+                    "[red]Invalid numeric IDs. Keeping current setting.[/red]"
                 )
         elif owner_choice == "5":
             username = input("Enter username (e.g. nobody): ").strip()
@@ -1396,22 +1391,20 @@ You can use either numeric IDs or names.
                 console.print(f"[green]✅ Set to {username}:{groupname}[/green]")
             else:
                 console.print(
-                    f"[red]Username and group name cannot be empty. Keeping current setting.[/red]"
+                    "[red]Username and group name cannot be empty. Keeping current setting.[/red]"
                 )
         else:
-            console.print(
-                f"[yellow]Invalid choice. Keeping current ownership.[/yellow]"
-            )
+            console.print("[yellow]Invalid choice. Keeping current ownership.[/yellow]")
     else:
         config["set_ownership"] = False
-        console.print(f"[yellow]❌ File ownership setting disabled[/yellow]")
+        console.print("[yellow]❌ File ownership setting disabled[/yellow]")
 
 
 def settings_menu():
     """Settings and preferences menu"""
     config = load_config()
 
-    console.print(f"\n[cyan]⚙️ SETTINGS MENU[/cyan]")
+    console.print("\n[cyan]⚙️ SETTINGS MENU[/cyan]")
 
     while True:
         config_manager = ConfigManager()
@@ -1533,12 +1526,12 @@ def settings_menu():
             new_path = input("Enter new library path: ").strip()
             if new_path:
                 config["library_path"] = new_path
-                console.print(f"[green]Library path updated.[/green]")
+                console.print("[green]Library path updated.[/green]")
         elif choice == "2":
             new_path = input("Enter new torrent path: ").strip()
             if new_path:
                 config["torrent_path"] = new_path
-                console.print(f"[green]Torrent path updated.[/green]")
+                console.print("[green]Torrent path updated.[/green]")
         elif choice == "3":
             configure_integrations_wizard(config_manager)
             config = config_manager.config  # Update config after changes
@@ -1568,7 +1561,7 @@ def settings_menu():
             if source and source not in recent_sources:
                 recent_sources.append(source)
                 config["recent_sources"] = recent_sources
-                console.print(f"[green]Source added to recent sources.[/green]")
+                console.print("[green]Source added to recent sources.[/green]")
         elif choice == "11":
             source = input("Enter source path to remove: ").strip()
             recent_sources = config.get("recent_sources", [])
@@ -1577,7 +1570,7 @@ def settings_menu():
             if source and source in recent_sources:
                 recent_sources.remove(source)
                 config["recent_sources"] = recent_sources
-                console.print(f"[green]Source removed from recent sources.[/green]")
+                console.print("[green]Source removed from recent sources.[/green]")
         elif choice == "12":
             # Reset to default settings
             config = {
@@ -1606,11 +1599,11 @@ def settings_menu():
                     "show_path": False,
                 },
             }
-            console.print(f"[green]Settings reset to default.[/green]")
+            console.print("[green]Settings reset to default.[/green]")
         elif choice == "13":
             break
         else:
-            console.print(f"[red]Invalid choice, please try again.[/red]")
+            console.print("[red]Invalid choice, please try again.[/red]")
 
     save_config(config)
 
@@ -1618,7 +1611,7 @@ def settings_menu():
 def show_interactive_help():
     """Show help for interactive mode"""
     print(
-        f"""
+        """
 [cyan]❓ HARDBOUND HELP[/cyan]
 
 [bold]What does Hardbound do?[/bold]
@@ -1627,7 +1620,7 @@ This saves space while letting you seed without duplicating files.
 
 [bold]Search-first workflow (NEW!):[/bold]
   hardbound index              # Build catalog (1500+ books → instant search)
-  hardbound search "rowling"   # Find books instantly  
+  hardbound search "rowling"   # Find books instantly
   hardbound select -m          # Interactive multi-select with fzf
 
 [bold]Classic commands:[/bold]
@@ -1701,12 +1694,12 @@ def find_recent_audiobooks(hours=24, max_depth=3, config=None):
     return sorted(recent, key=lambda p: p.stat().st_mtime, reverse=True)[:20]
 
 
-def _link_selected_paths(selected_paths: List[str]):
+def _link_selected_paths(selected_paths: list[str]):
     """Helper to link selected paths"""
     config = load_config()
     default_dst = config.get("torrent_path", "")
 
-    console.print(f"\n[bold]Destination root:[/bold]")
+    console.print("\n[bold]Destination root:[/bold]")
     if default_dst:
         print(f"Default: {default_dst}")
         dst_input = input("Path (Enter for default): ").strip()
@@ -1765,16 +1758,16 @@ def browse_directory_tree():
                     marker = " 🎵" if has_audio else ""
                     items.append((f"[D] {item.name}{marker}", item))
         except PermissionError:
-            console.print(f"[red]Permission denied[/red]")
+            console.print("[red]Permission denied[/red]")
 
-        for i, (display, path) in enumerate(items[:20], 1):
+        for i, (display, _path) in enumerate(items[:20], 1):
             print(f"  {i:2d}) {display}")
 
         if len(items) > 20:
             print(f"  ... and {len(items) - 20} more")
 
         console.print(
-            f"\n[yellow]Enter number to navigate, 'select' to choose current, 'back' to go up:[/yellow]"
+            "\n[yellow]Enter number to navigate, 'select' to choose current, 'back' to go up:[/yellow]"
         )
         choice = input("Choice: ").strip().lower()
 
@@ -1792,7 +1785,7 @@ def browse_directory_tree():
 
 def configure_integrations_wizard(config_manager: ConfigManager):
     """Configure integration settings"""
-    console.print(f"\n[cyan]🔧 INTEGRATION CONFIGURATION[/cyan]")
+    console.print("\n[cyan]🔧 INTEGRATION CONFIGURATION[/cyan]")
 
     while True:
         integrations = config_manager.get("integrations", {})
@@ -1802,7 +1795,7 @@ def configure_integrations_wizard(config_manager: ConfigManager):
 
         assert isinstance(integrations, dict)  # Tell Pylance integrations is a dict
 
-        console.print(f"\n[yellow]Available integrations:[/yellow]")
+        console.print("\n[yellow]Available integrations:[/yellow]")
         integration_list = list(integrations.keys())
         for i, (name, int_config) in enumerate(integrations.items(), 1):
             if isinstance(int_config, dict):
@@ -1814,11 +1807,11 @@ def configure_integrations_wizard(config_manager: ConfigManager):
                     f"  [green]{i}[/green]) {name.upper()}: {enabled} {path}{limit_str}"
                 )
 
-        console.print(f"\n[green]Options:[/green]")
+        console.print("\n[green]Options:[/green]")
         console.print(
             f"  [green]1-{len(integration_list)}[/green]) Configure integration"
         )
-        console.print(f"  [green]q[/green]) Back to settings")
+        console.print("  [green]q[/green]) Back to settings")
 
         choice = input(f"\nChoice (1-{len(integration_list)}, q): ").strip().lower()
 
@@ -1830,7 +1823,7 @@ def configure_integrations_wizard(config_manager: ConfigManager):
                 integration_name = integration_list[idx]
                 configure_single_integration(config_manager, integration_name)
         else:
-            console.print(f"[yellow]Invalid choice.[/yellow]")
+            console.print("[yellow]Invalid choice.[/yellow]")
 
 
 def configure_single_integration(config_manager: ConfigManager, integration_name: str):
@@ -1857,13 +1850,13 @@ def configure_single_integration(config_manager: ConfigManager, integration_name
         console.print(f"  Path: {path if path else 'Not set'}")
         console.print(f"  Path limit{limit_str}")
 
-        console.print(f"\n[green]Options:[/green]")
+        console.print("\n[green]Options:[/green]")
         console.print(
             f"  [green]1[/green]) {'Disable' if enabled else 'Enable'} integration"
         )
-        console.print(f"  [green]2[/green]) Change path")
-        console.print(f"  [green]3[/green]) Test path (validate)")
-        console.print(f"  [green]q[/green]) Back")
+        console.print("  [green]2[/green]) Change path")
+        console.print("  [green]3[/green]) Test path (validate)")
+        console.print("  [green]q[/green]) Back")
 
         choice = input("Choice (1-3, q): ").strip().lower()
 
@@ -1896,7 +1889,7 @@ def configure_single_integration(config_manager: ConfigManager, integration_name
         elif choice == "3":
             path = integration.get("path", "")
             if not path:
-                console.print(f"[yellow]No path configured[/yellow]")
+                console.print("[yellow]No path configured[/yellow]")
             else:
                 from .utils.validation import PathValidator
 
@@ -1905,11 +1898,11 @@ def configure_single_integration(config_manager: ConfigManager, integration_name
                         f"[red]❌ Path too long: {len(path)} characters (limit: {limit})[/red]"
                     )
                 elif PathValidator.validate_destination_path_with_limit(path, limit):
-                    console.print(f"[green]✅ Path is valid[/green]")
+                    console.print("[green]✅ Path is valid[/green]")
                 else:
-                    console.print(f"[red]❌ Path validation failed[/red]")
+                    console.print("[red]❌ Path validation failed[/red]")
         else:
-            console.print(f"[yellow]Invalid choice.[/yellow]")
+            console.print("[yellow]Invalid choice.[/yellow]")
 
         # Refresh integration data
         integration = config_manager.get_integration(integration_name)
@@ -1921,7 +1914,7 @@ def configure_logging_wizard(config):
     """Configure logging settings wizard"""
     log.info("logging.config_wizard_start", operation="configure_logging")
 
-    console.print(f"\n[cyan]📋 LOGGING CONFIGURATION[/cyan]")
+    console.print("\n[cyan]📋 LOGGING CONFIGURATION[/cyan]")
 
     # Ensure logging config exists
     if "logging" not in config:
