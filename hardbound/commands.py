@@ -1780,13 +1780,19 @@ def summary_table(stats: dict, elapsed: float):
 
 # ---------- Core helpers ----------
 def zero_pad_vol(name: str, width: int = 2) -> str:
-    """Turn 'vol_4' into 'vol_04' (width=2) only in the basename string provided."""
+    """Turn 'vol_4' into 'vol_04' and preserve decimals like 'vol_7.5' -> 'vol_07.5' (width=2) only in the basename string provided."""
 
     def pad(match):
-        num = match.group(1)
-        return f"vol_{int(num):0{width}d}"
+        num_part = match.group(1)
+        if '.' in num_part:
+            # Handle decimal volumes like "7.5"
+            whole, decimal = num_part.split('.', 1)
+            return f"vol_{int(whole):0{width}d}.{decimal}"
+        else:
+            # Handle integer volumes like "7"
+            return f"vol_{int(num_part):0{width}d}"
 
-    return re.sub(r"vol_(\d+)", pad, name)
+    return re.sub(r"vol_(\d+(?:\.\d+)?)", pad, name)
 
 
 def normalize_weird_ext(src_name: str) -> str:

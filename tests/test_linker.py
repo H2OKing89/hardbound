@@ -38,6 +38,13 @@ class TestZeroPadVol:
         """Test multiple volume numbers in one string"""
         assert zero_pad_vol("vol_1_vol_2") == "vol_01_vol_02"
 
+    def test_zero_pad_decimal_volumes(self) -> None:
+        """Test decimal volume padding"""
+        assert zero_pad_vol("vol_7.5") == "vol_07.5"
+        assert zero_pad_vol("vol_11.5") == "vol_11.5"
+        assert zero_pad_vol("vol_3.25") == "vol_03.25"
+        assert zero_pad_vol("vol_1.5_vol_2.5") == "vol_01.5_vol_02.5"
+
 
 class TestNormalizeWeirdExt:
     """Test weird extension normalization"""
