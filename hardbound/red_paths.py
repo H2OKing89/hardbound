@@ -49,19 +49,31 @@ def normalize_volume(volume_str: str) -> str:
         match = re.search(pattern, volume_str, re.IGNORECASE)
         if match:
             volume_part = match.group(1)
-            if '.' in volume_part:
+            if "." in volume_part:
                 # Handle decimal volumes like "13.5"
-                whole, decimal = volume_part.split('.', 1)
-                return f"vol_{int(whole):02d}.{decimal}"
+                whole, decimal = volume_part.split(".", 1)
+                if decimal.isdigit():
+                    return f"vol_{int(whole):02d}.{decimal}"
+                else:
+                    # If decimal part is not numeric, fallback to original string
+                    return volume_str
             else:
                 # Handle integer volumes like "13"
                 num = int(volume_part)
                 return f"vol_{num:02d}"
 
-    # If no pattern matches, return as-is but try to format
-    if '.' in volume_str:
-        return volume_str  # Don't mess with decimals we don't understand
+    # If no pattern matches, attempt to format consistently
+    if "." in volume_str:
+        # Fallback: format as vol_XX.YY for unmatched decimals
+        parts = volume_str.split(".", 1)
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            whole, decimal = parts
+            return f"vol_{whole.zfill(2)}.{decimal}"
+        else:
+            # Invalid decimal format, return as-is
+            return volume_str
     else:
+        # Fallback: format as vol_XX for unmatched integers
         return f"vol_{volume_str.zfill(2)}"
 
 

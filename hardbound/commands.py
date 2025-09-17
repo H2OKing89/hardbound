@@ -1784,15 +1784,30 @@ def zero_pad_vol(name: str, width: int = 2) -> str:
 
     def pad(match):
         num_part = match.group(1)
-        if '.' in num_part:
+        if "." in num_part:
             # Handle decimal volumes like "7.5"
-            whole, decimal = num_part.split('.', 1)
-            return f"vol_{int(whole):0{width}d}.{decimal}"
+            whole, decimal = num_part.split(".", 1)
+            try:
+                whole_int = int(whole)
+                if (
+                    decimal and decimal.isdigit()
+                ):  # Ensure decimal part is not empty and all digits
+                    return f"vol_{whole_int:0{width}d}.{decimal}"
+                else:
+                    # If decimal part is empty or not all digits, return original match unchanged
+                    return match.group(0)
+            except ValueError:
+                # If whole part is not a valid integer, return original match unchanged
+                return match.group(0)
         else:
             # Handle integer volumes like "7"
-            return f"vol_{int(num_part):0{width}d}"
+            try:
+                return f"vol_{int(num_part):0{width}d}"
+            except ValueError:
+                # If not a valid integer, return original match unchanged
+                return match.group(0)
 
-    return re.sub(r"vol_(\d+(?:\.\d+)?)", pad, name)
+    return re.sub(r"vol_(\d+(?:\.[^_\s]+)?)", pad, name)
 
 
 def normalize_weird_ext(src_name: str) -> str:
