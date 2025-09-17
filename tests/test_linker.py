@@ -38,6 +38,25 @@ class TestZeroPadVol:
         """Test multiple volume numbers in one string"""
         assert zero_pad_vol("vol_1_vol_2") == "vol_01_vol_02"
 
+    def test_zero_pad_decimal_volumes(self) -> None:
+        """Test decimal volume padding"""
+        assert zero_pad_vol("vol_7.5") == "vol_07.5"
+        assert zero_pad_vol("vol_11.5") == "vol_11.5"
+        assert zero_pad_vol("vol_3.25") == "vol_03.25"
+        assert zero_pad_vol("vol_1.5_vol_2.5") == "vol_01.5_vol_02.5"
+
+    def test_zero_pad_validation_edge_cases(self) -> None:
+        """Test validation of malformed decimal parts"""
+        # Valid decimal parts should be processed normally
+        assert zero_pad_vol("vol_7.5") == "vol_07.5"
+
+        # Malformed decimal parts should return original unchanged (robust fallback)
+        assert zero_pad_vol("vol_7.abc") == "vol_7.abc"
+        assert zero_pad_vol("vol_7.5x") == "vol_7.5x"
+
+        # Trailing dot case: vol_7 gets padded, dot is preserved
+        assert zero_pad_vol("vol_7.") == "vol_07."
+
 
 class TestNormalizeWeirdExt:
     """Test weird extension normalization"""

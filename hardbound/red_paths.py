@@ -33,14 +33,14 @@ class Tokens:
 
 
 def normalize_volume(volume_str: str) -> str:
-    """Normalize volume string to vol_XX format"""
-    # Handle various volume formats
+    """Normalize volume string to vol_XX format, preserving decimals"""
+    # Handle various volume formats including decimals
     patterns = [
-        r"vol_(\d+)",  # vol_13
-        r"vol\.?\s*(\d+)",  # vol.13, vol 13
-        r"volume\s+(\d+)",  # volume 13
-        r"v\.?\s*(\d+)",  # v.13, v13
-        r"(\d+)",  # just "13"
+        r"vol_(\d+(?:\.\d+)?)",  # vol_13 or vol_13.5
+        r"vol\.?\s*(\d+(?:\.\d+)?)",  # vol.13, vol 13, vol.13.5
+        r"volume\s+(\d+(?:\.\d+)?)",  # volume 13, volume 13.5
+        r"v\.?\s*(\d+(?:\.\d+)?)",  # v.13, v13, v.13.5
+        r"(\d+(?:\.\d+)?)",  # just "13" or "13.5"
     ]
 
     volume_str = volume_str.lower().strip()
@@ -48,11 +48,33 @@ def normalize_volume(volume_str: str) -> str:
     for pattern in patterns:
         match = re.search(pattern, volume_str, re.IGNORECASE)
         if match:
-            num = int(match.group(1))
-            return f"vol_{num:02d}"
+            volume_part = match.group(1)
+            if "." in volume_part:
+                # Handle decimal volumes like "13.5"
+                whole, decimal = volume_part.split(".", 1)
+                if decimal.isdigit():
+                    return f"vol_{int(whole):02d}.{decimal}"
+                else:
+                    # If decimal part is not numeric, fallback to original string
+                    return volume_str
+            else:
+                # Handle integer volumes like "13"
+                num = int(volume_part)
+                return f"vol_{num:02d}"
 
-    # If no pattern matches, return as-is but try to format
-    return f"vol_{volume_str.zfill(2)}"
+    # If no pattern matches, attempt to format consistently
+    if "." in volume_str:
+        # Fallback: format as vol_XX.YY for unmatched decimals
+        parts = volume_str.split(".", 1)
+        if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+            whole, decimal = parts
+            return f"vol_{whole.zfill(2)}.{decimal}"
+        else:
+            # Invalid decimal format, return as-is
+            return volume_str
+    else:
+        # Fallback: format as vol_XX for unmatched integers
+        return f"vol_{volume_str.zfill(2)}"
 
 
 def parse_tokens(name: str, extension: str = ".m4b") -> Tokens:
@@ -100,8 +122,8 @@ def parse_tokens(name: str, extension: str = ".m4b") -> Tokens:
         working = working[: year_match.start()].rstrip()
 
     # Parse the new format: <title> vol_XX <subtitle>
-    # Look for volume pattern in the working string
-    vol_pattern = r"\b(vol_\d+)\b"
+    # Look for volume pattern in the working string (including decimal volumes like vol_07.5)
+    vol_pattern = r"\b(vol_\d+(?:\.\d+)?)\b"
     vol_match = re.search(vol_pattern, working, re.IGNORECASE)
 
     if vol_match:
