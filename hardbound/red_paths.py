@@ -124,12 +124,12 @@ def parse_tokens(name: str, extension: str = ".m4b") -> Tokens:
     # Parse the new format: <title> vol_XX <subtitle>
     # Use robust volume matching with validation to prevent decimal fragment leakage
     vol_match = re.search(r"vol_?\s*\d+(?:\.\d+)?(?=\s|$)", working, re.IGNORECASE)
-    
+
     if vol_match:
         # Extract the volume and validate it
         matched_volume = vol_match.group(0)
         volume = normalize_volume(matched_volume)
-        
+
         # Only proceed if the normalized volume contains a valid decimal or is integer
         volume_is_valid = True
         if "." in matched_volume:
@@ -140,17 +140,17 @@ def parse_tokens(name: str, extension: str = ".m4b") -> Tokens:
                     volume_is_valid = False
             except IndexError:
                 volume_is_valid = False
-        
+
         if volume_is_valid:
             # Split around the volume to get title and subtitle
             vol_start, vol_end = vol_match.span()
             title_part = working[:vol_start].strip()
             subtitle_part = working[vol_end:].strip()
-            
+
             # Clean up old format markers if present
             title_part = title_part.rstrip(" -")
             subtitle_part = subtitle_part.lstrip(" -")
-            
+
             title = title_part
             subtitle = subtitle_part if subtitle_part else None
         else:
