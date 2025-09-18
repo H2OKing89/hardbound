@@ -9,6 +9,7 @@ The user reported a **40-second delay** before catalog scanning even began. This
 The `index_directory()` method in `hardbound/catalog.py` was using a **two-phase approach**:
 
 ### Phase 1: Silent Collection (THE BOTTLENECK)
+
 ```python
 # Collect all audiobook directories in one pass
 for path in root.rglob("*"):
@@ -22,6 +23,7 @@ for path in root.rglob("*"):
 ```
 
 ### Phase 2: Processing with Progress
+
 ```python
 # Only NOW does progress start
 if progress_callback and total_dirs > 0:
