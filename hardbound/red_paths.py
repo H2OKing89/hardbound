@@ -122,26 +122,49 @@ def parse_tokens(name: str, extension: str = ".m4b") -> Tokens:
         working = working[: year_match.start()].rstrip()
 
     # Parse the new format: <title> vol_XX <subtitle>
-    # Look for volume pattern in the working string (including decimal volumes like vol_07.5)
-    vol_pattern = r"\b(vol_\d+(?:\.\d+)?)\b"
-    vol_match = re.search(vol_pattern, working, re.IGNORECASE)
-
+    # Use robust volume matching with validation to prevent decimal fragment leakage
+    vol_match = re.search(r"vol_?\s*\d+(?:\.\d+)?(?=\s|$)", working, re.IGNORECASE)
+    
     if vol_match:
-        volume_str = vol_match.group(1)
-        volume = normalize_volume(volume_str)
-
-        # Split around the volume to get title and subtitle
-        vol_start, vol_end = vol_match.span()
-        title_part = working[:vol_start].strip()
-        subtitle_part = working[vol_end:].strip()
-
-        # Clean up old format markers if present
-        # Remove trailing spaces/hyphens from title and leading spaces/hyphens from subtitle
-        title_part = title_part.rstrip(" -")
-        subtitle_part = subtitle_part.lstrip(" -")
-
-        title = title_part
-        subtitle = subtitle_part if subtitle_part else None
+        # Extract the volume and validate it
+        matched_volume = vol_match.group(0)
+        volume = normalize_volume(matched_volume)
+        
+        # Only proceed if the normalized volume contains a valid decimal or is integer
+        volume_is_valid = True
+        if "." in matched_volume:
+            # For decimal volumes, ensure the decimal part is purely numeric
+            try:
+                decimal_part = matched_volume.split(".")[1]
+                if not decimal_part.isdigit():
+                    volume_is_valid = False
+            except IndexError:
+                volume_is_valid = False
+        
+        if volume_is_valid:
+            # Split around the volume to get title and subtitle
+            vol_start, vol_end = vol_match.span()
+            title_part = working[:vol_start].strip()
+            subtitle_part = working[vol_end:].strip()
+            
+            # Clean up old format markers if present
+            title_part = title_part.rstrip(" -")
+            subtitle_part = subtitle_part.lstrip(" -")
+            
+            title = title_part
+            subtitle = subtitle_part if subtitle_part else None
+        else:
+            # Invalid volume format, fallback to default parsing
+            parts = [p.strip() for p in working.split(" - ") if p.strip()]
+            if len(parts) >= 2:
+                title = parts[0]
+                volume_part = parts[1]
+                volume = normalize_volume(volume_part)
+                subtitle = " - ".join(parts[2:]) if len(parts) > 2 else None
+            else:
+                title = parts[0] if parts else working
+                volume = "vol_01"  # Default
+                subtitle = None
     else:
         # Fallback: no volume found, try old format or default
         parts = [p.strip() for p in working.split(" - ") if p.strip()]
