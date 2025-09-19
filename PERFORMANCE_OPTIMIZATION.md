@@ -66,7 +66,7 @@ for path in root.rglob("*"):
 
 **Test Environment**: Small test directory with 2 audiobooks
 
-- **Old approach**: 0.0010 seconds  
+- **Old approach**: 0.0010 seconds
 - **New approach**: 0.0007 seconds
 - **Improvement**: 31% faster (1.4x speedup)
 

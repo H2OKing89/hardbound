@@ -599,6 +599,70 @@ def fallback_picker(candidates: list[dict], multi: bool) -> list[str]:
     return []
 
 
+def automated_maintenance():
+    """Run automated database maintenance (clean orphaned entries + update catalog)"""
+    from .config import load_config
+    from .utils.validation import PathValidator
+
+    console.print("\n[cyan]🔧 Running automated maintenance...[/cyan]")
+
+    catalog = AudiobookCatalog()
+
+    try:
+        # Step 1: Clean orphaned entries
+        console.print("[dim]  • Cleaning orphaned entries...[/dim]")
+        clean_result = catalog.clean_orphaned_entries(verbose=False)
+        if clean_result["removed"] > 0:
+            console.print(
+                f"[green]  ✅ Cleaned {clean_result['removed']} orphaned entries[/green]"
+            )
+
+            # Step 2: Update catalog only if orphaned entries were found and removed
+            config = load_config()
+            library_path = config.get("library_path")
+
+            if library_path and Path(library_path).exists():
+                console.print(f"[dim]  • Updating catalog from {library_path}...[/dim]")
+                progress = ProgressIndicator("Updating catalog")
+                count = catalog.index_directory(
+                    Path(library_path), verbose=False, progress_callback=progress
+                )
+                console.print(
+                    f"[green]  ✅ Updated catalog with {count} audiobooks[/green]"
+                )
+            else:
+                # Fallback to default search paths
+                default_paths = PathValidator.get_default_search_paths()
+                if default_paths:
+                    console.print(
+                        "[dim]  • Updating catalog from default path...[/dim]"
+                    )
+                    progress = ProgressIndicator("Updating catalog")
+                    count = catalog.index_directory(
+                        default_paths[0], verbose=False, progress_callback=progress
+                    )
+                    console.print(
+                        f"[green]  ✅ Updated catalog with {count} audiobooks[/green]"
+                    )
+                else:
+                    console.print(
+                        "[yellow]  ⚠ No library path configured for automatic updates[/yellow]"
+                    )
+        else:
+            console.print("[dim]  • No orphaned entries found[/dim]")
+            console.print(
+                "[green]  ✅ Catalog appears to be up to date, skipping update[/green]"
+            )
+
+        console.print("[cyan]🔧 Automated maintenance completed[/cyan]")
+
+    except Exception as e:
+        console.print(f"[red]❌ Maintenance error: {e}[/red]")
+        log.error("maintenance.automated_failed", error=str(e))
+    finally:
+        catalog.close()
+
+
 def interactive_mode():
     """Enhanced interactive mode with improved UX"""
     config = load_config()
@@ -616,6 +680,9 @@ def interactive_mode():
                 default_path[0], verbose=False, progress_callback=progress
             )
         catalog.close()
+    else:
+        # Database exists, run automated maintenance
+        automated_maintenance()
 
     # First run setup with better UX
     if config.get("first_run", True):
