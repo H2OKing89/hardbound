@@ -10,9 +10,11 @@ from typing import Any, cast
 
 from .utils.validation import PathValidator
 
-CONFIG_DIR = Path.home() / ".config" / "hardbound"
+# Store config in the same directory as the script for portability
+SCRIPT_DIR = Path(__file__).parent.parent  # Go up to the main hardbound directory
+CONFIG_DIR = SCRIPT_DIR
 CONFIG_FILE = CONFIG_DIR / "config.json"
-DEFAULT_LOG_DIR = Path.cwd() / "logs"
+DEFAULT_LOG_DIR = SCRIPT_DIR / "logs"
 
 
 @dataclass
@@ -23,7 +25,7 @@ class LoggingConfig:
     file_enabled: bool = True
     console_enabled: bool = True
     json_file: bool = True
-    path: Path = DEFAULT_LOG_DIR / "hardbound.log"
+    path: Path = SCRIPT_DIR / "logs" / "hardbound.log"
     rotate_max_bytes: int = 10 * 1024 * 1024  # 10 MiB
     rotate_backups: int = 5
     rich_tracebacks: bool = True
@@ -72,7 +74,7 @@ DEFAULT_CONFIG = {
         "file_enabled": True,
         "console_enabled": True,
         "json_file": True,
-        "path": str(DEFAULT_LOG_DIR / "hardbound.log"),
+        "path": str(SCRIPT_DIR / "logs" / "hardbound.log"),
         "rotate_max_bytes": 10 * 1024 * 1024,  # 10 MiB
         "rotate_backups": 5,
         "rich_tracebacks": True,

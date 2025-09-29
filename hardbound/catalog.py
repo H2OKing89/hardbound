@@ -19,8 +19,8 @@ from rich.console import Console
 # Global console instance
 console = Console()
 
-# Database paths
-DB_DIR = Path.home() / ".cache" / "hardbound"
+# Database paths - store in script directory for portability
+DB_DIR = Path(__file__).parent.parent  # Go up to the main hardbound directory
 DB_FILE = DB_DIR / "catalog.db"
 
 
@@ -440,7 +440,7 @@ class AudiobookCatalog:
     def get_search_history(self, limit: int = 20) -> list[str]:
         """Get recent search history"""
         try:
-            history_file = Path.home() / ".cache" / "hardbound" / "search_history.txt"
+            history_file = DB_DIR / "search_history.txt"
             if history_file.exists():
                 with open(history_file, encoding="utf-8") as f:
                     lines = f.readlines()
@@ -453,7 +453,7 @@ class AudiobookCatalog:
     def _record_search_history(self, query: str):
         """Record a search query in history"""
         try:
-            history_file = Path.home() / ".cache" / "hardbound" / "search_history.txt"
+            history_file = DB_DIR / "search_history.txt"
             history_file.parent.mkdir(parents=True, exist_ok=True)
 
             # Read existing history

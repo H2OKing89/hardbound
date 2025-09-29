@@ -225,7 +225,7 @@ Options:
 
 ## Configuration
 
-Configuration is stored in `~/.config/hardbound/config.json`:
+Configuration is stored in `./config.json` (in the same directory as the script):
 
 ```json
 {

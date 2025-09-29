@@ -91,12 +91,13 @@ IMG_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
 DOC_EXTS = {".pdf", ".txt", ".nfo"}
 AUDIO_EXTS = {".m4b", ".mp3", ".flac", ".m4a"}
 
-# Configuration handling
-CONFIG_DIR = Path.home() / ".config" / "hardbound"
+# Configuration handling - store in script directory for portability
+SCRIPT_DIR = Path(__file__).parent.parent  # Go up to the main hardbound directory
+CONFIG_DIR = SCRIPT_DIR
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 # Add near top with other paths
-DB_DIR = Path.home() / ".cache" / "hardbound"
+DB_DIR = SCRIPT_DIR
 DB_FILE = DB_DIR / "catalog.db"
 
 
