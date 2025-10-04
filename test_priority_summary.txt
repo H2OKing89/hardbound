@@ -1,0 +1,175 @@
+═══════════════════════════════════════════════════════════════════════════════
+                    HARDBOUND TEST COVERAGE IMPROVEMENT PLAN
+                          Current: 11% → Target: 80%
+═══════════════════════════════════════════════════════════════════════════════
+
+PHASE 1: RED PATHS (CRITICAL) 🔴
+─────────────────────────────────
+Module:          red_paths.py
+Current:         9% (179/205 untested)
+Target:          80%
+Time:            16-22 hours
+Priority:        HIGHEST - RED compliance is non-negotiable
+
+Tasks:
+  1.1 Token Parsing          [25 tests] - parse_tokens(), normalize_volume()
+  1.2 Path Building          [20 tests] - build_filename(), validate_path_length()
+  1.3 Path Shortening        [30 tests] - RED trimming algorithm (THE CRITICAL ONE)
+  1.4 Integration            [15 tests] - End-to-end RED compliance validation
+
+Why First?
+  • Zero existing tests (no test_red_paths.py file)
+  • Business critical: Failed uploads = rejected by RED tracker
+  • Pure functions: Fast to test, no I/O dependencies
+  • Well-specified: RED_PATH_SPEC.md provides clear requirements
+
+Quick Start: Create tests/test_red_paths.py and start with token parsing
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PHASE 2: CATALOG (HIGH) ��
+──────────────────────────
+Module:          catalog.py
+Current:         34% (245/386 untested)
+Target:          75%
+Time:            14-19 hours
+Priority:        HIGH - Data integrity foundation
+
+Tasks:
+  2.1 DB Schema              [12 tests] - FTS5 setup, triggers, migration
+  2.2 CRUD Operations        [18 tests] - add/update/delete/get items
+  2.3 FTS5 Search            [25 tests] - Full-text search, ranking, performance
+  2.4 Path Parsing           [20 tests] - ASIN extraction, metadata parsing
+  2.5 Catalog Management     [15 tests] - rebuild, clean, vacuum, stats
+
+Why Second?
+  • Foundation for search and interactive mode
+  • FTS5 complexity requires thorough testing
+  • Some coverage exists (34%) - expand on working foundation
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PHASE 3: LINKER (MEDIUM) 🟡
+───────────────────────────
+Module:          linker.py
+Current:         44% (186/340 untested)
+Target:          75%
+Time:            8-12 hours
+Priority:        MEDIUM - Core functionality, partial coverage
+
+Tasks:
+  3.1 Hardlink Core          [20 tests] - create_hardlink(), preflight, RED linking
+  3.2 File Collection        [15 tests] - collect_audiobook_files(), filtering
+  3.3 Batch Processing       [12 tests] - Bulk operations, error handling
+  3.4 Config Integration     [8 tests]  - Permissions, owner/group settings
+
+Why Third?
+  • Existing foundation (44% covered, helpers tested)
+  • Depends on RED paths (Phase 1) for RED linking
+  • Complex I/O operations (slower tests)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PHASE 4: COMMANDS (LOW) ��
+──────────────────────────
+Module:          commands.py
+Current:         0% (1301/1301 untested)
+Target:          60%
+Time:            7-11 hours
+Priority:        LOW - Integration layer
+
+Tasks:
+  4.1 Search Commands        [15 tests] - search_command(), by_author, by_series
+  4.2 Link Commands          [15 tests] - link_command(), link_red_command()
+  4.3 Catalog Commands       [12 tests] - catalog_add(), rebuild(), clean()
+  4.4 Config Commands        [10 tests] - config_init(), show(), validate()
+
+Why Fourth?
+  • Depends on all lower layers (RED + Catalog + Linker)
+  • Integration tests (slower, more setup)
+  • Lower risk: Orchestration logic, fewer business rules
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PHASE 5: ENTRY POINTS (LOW) 🔵
+──────────────────────────────
+Module:          hardbound.py
+Current:         0% (126/126 untested)
+Target:          70%
+Time:            1-2 hours
+Priority:        LOW - Thin orchestration
+
+Tasks:
+  5.1 CLI Parsing            [10 tests] - main(), argument parsing, exit codes
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PHASE 6: UI & UTILS (OPTIONAL) 🔵
+──────────────────────────────────
+Modules:         ui/*, utils/*
+Current:         0-31% (mixed)
+Target:          50-70%
+Time:            5-7 hours
+Priority:        OPTIONAL - User-facing, less critical
+
+═══════════════════════════════════════════════════════════════════════════════
+
+PROJECTED OUTCOMES
+──────────────────
+After Phase 1-3:  55-60% coverage  (Core business logic solid)
+After Phase 1-5:  70-75% coverage  (All functionality tested)
+After All Phases: 78-82% coverage  ✅ TARGET MET
+
+TOTAL EFFORT:     51-73 hours (6-9 developer days)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+QUICK WINS - FIRST WEEK
+───────────────────────
+Day 1-2:  Phase 1.1-1.2  → Token parsing + path building (40% red_paths.py)
+Day 3-4:  Phase 1.3-1.4  → Path shortening + integration (80% red_paths.py) ✅
+Day 5:    Phase 2.1-2.2  → DB schema + CRUD (50% catalog.py)
+
+Week 1 Result: ~25% overall coverage, RED compliance fully validated
+
+═══════════════════════════════════════════════════════════════════════════════
+
+NEW TEST FILES TO CREATE
+────────────────────────
+Priority 1 (This Week):
+  ✅ tests/test_red_paths.py              (NEW - CRITICAL)
+  ⬜ tests/test_catalog_crud.py           (NEW)
+  ⬜ tests/test_catalog_fts.py            (NEW)
+
+Priority 2 (Next Week):
+  ⬜ tests/test_catalog_parsing.py        (NEW)
+  ⬜ tests/test_linker_core.py            (expand existing)
+  ⬜ tests/test_commands_search.py        (NEW)
+
+Priority 3 (Later):
+  ⬜ tests/test_commands_link.py          (NEW)
+  ⬜ tests/test_commands_catalog.py       (NEW)
+  ⬜ tests/test_cli.py                    (expand test_main.py)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+CRITICAL SUCCESS FACTORS
+─────────────────────────
+✅ Start with RED paths - Zero failures in production uploads
+✅ Test invariants explicitly - ASIN in folder AND file, path <= 180 chars
+✅ Use @pytest.mark.parametrize - Cover all volume formats, ASIN variants
+✅ Test error paths - Missing ASIN, corrupt DB, permission errors
+✅ Mock external dependencies - fzf, filesystem permissions
+✅ Set up CI coverage gates - Prevent regression from 11%
+
+❌ Avoid testing UI rendering details (Rich output)
+❌ Avoid slow tests without @pytest.mark.slow marker
+❌ Avoid using real library paths - Use tmp_path fixtures
+
+═══════════════════════════════════════════════════════════════════════════════
+
+READY TO START?
+───────────────
+Next Command: Create tests/test_red_paths.py with Phase 1.1 (token parsing)
+
+For detailed test cases, see: TEST_IMPROVEMENT_PLAN.md

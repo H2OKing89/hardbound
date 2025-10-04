@@ -81,13 +81,47 @@ def parse_selection_input(input_str: str, max_items: int) -> list[int]:
     return sorted(indices)
 
 
+def display_selection_review(selected_books: list[dict[str, Any]]) -> None:
+    """Display a formatted review of selected audiobooks.
+
+    Args:
+        selected_books: List of book dictionaries with metadata
+    """
+    if not selected_books:
+        return
+
+    console.print("\n[bold cyan]📋 SELECTION REVIEW[/bold cyan]")
+    console.print(f"[dim]You have selected {len(selected_books)} audiobook(s):[/dim]\n")
+
+    for i, book in enumerate(selected_books, 1):
+        title = book.get("book", "Unknown Title")
+        author = book.get("author", "Unknown Author")
+        series = book.get("series", "")
+        size_mb = book.get("size", 0) / (1024 * 1024)
+        indicator = "📘" if book.get("has_m4b") else "🎵"
+
+        # Format the display string
+        if series and series != "—":
+            display = f"{author} ▸ [magenta]{series}[/magenta] ▸ {title}"
+        else:
+            display = f"{author} ▸ {title}"
+
+        console.print(
+            f"  [green]{i:2d}[/green]. {display} {indicator} [dim]({size_mb:.0f}MB)[/dim]"
+        )
+
+    # Calculate total size
+    total_size_mb = sum(book.get("size", 0) for book in selected_books) / (1024 * 1024)
+    console.print(f"\n[bold]Total size:[/bold] [yellow]{total_size_mb:.1f} MB[/yellow]")
+
+
 def have_fzf() -> bool:
     """Check if fzf is available"""
 
     return shutil.which("fzf") is not None
 
 
-def hierarchical_browser(catalog) -> list[str]:
+def hierarchical_browser(catalog) -> list[dict[str, Any]]:
     """Browse audiobooks by author/series hierarchy"""
 
     # Get all unique authors from catalog
@@ -246,7 +280,7 @@ def hierarchical_browser(catalog) -> list[str]:
     if choice == "q":
         return []
     elif choice == "all":
-        return [book["path"] for book in all_selectable]
+        return all_selectable
     elif not choice:
         return []
     else:
@@ -254,11 +288,11 @@ def hierarchical_browser(catalog) -> list[str]:
         selected_indices = parse_selection_input(choice, len(all_selectable))
         for idx in selected_indices:
             if 0 <= idx < len(all_selectable):
-                selected.append(all_selectable[idx]["path"])
+                selected.append(all_selectable[idx])
         return selected
 
 
-def enhanced_text_search_browser(catalog) -> list[str]:
+def enhanced_text_search_browser(catalog) -> list[dict[str, Any]]:
     """Enhanced text search browser with autocomplete and history"""
     console.print("\n[cyan]🔍 ENHANCED TEXT SEARCH[/cyan]")
 
@@ -350,7 +384,7 @@ def enhanced_text_search_browser(catalog) -> list[str]:
         elif choice == "p" and current_page > 0:
             current_page -= 1
         elif choice == "all":
-            return [book["path"] for book in results]
+            return results
         else:
             # Parse number selections
             selected = []
@@ -358,7 +392,7 @@ def enhanced_text_search_browser(catalog) -> list[str]:
                 if num.isdigit():
                     idx = int(num) - 1
                     if 0 <= idx < len(results):
-                        selected.append(results[idx]["path"])
+                        selected.append(results[idx])
             if selected:
                 return selected
 
@@ -469,7 +503,9 @@ def fzf_pick(candidates: list[dict], multi: bool = True) -> list[str]:
                 return results
 
         temp_catalog = TempCatalog()
-        return hierarchical_browser(temp_catalog)
+        selected_books = hierarchical_browser(temp_catalog)
+        # Extract paths from selected books
+        return [book["path"] for book in selected_books]
 
     # Build searchable lines with metadata
     lines = []
@@ -801,22 +837,22 @@ def search_and_link_wizard():
     choice = input("\nChoice (1-3): ").strip()
 
     if choice == "1":
-        selected_paths = hierarchical_browser(catalog)
+        selected_books = hierarchical_browser(catalog)
     elif choice == "2":
-        selected_paths = enhanced_text_search_browser(catalog)
+        selected_books = enhanced_text_search_browser(catalog)
     elif choice == "3":
         results = catalog.search("*", limit=50)
         if results:
             console.print("\n[green]Recent audiobooks:[/green]")
-            selected_paths = enhanced_text_search_browser(catalog)
+            selected_books = enhanced_text_search_browser(catalog)
         else:
             console.print("[yellow]No audiobooks found[/yellow]")
-            selected_paths = []
+            selected_books = []
     else:
         catalog.close()
         return
 
-    if not selected_paths:
+    if not selected_books:
         catalog.close()
         return
 
@@ -890,9 +926,12 @@ def search_and_link_wizard():
         catalog.close()
         return
 
+    # Show selection review
+    display_selection_review(selected_books)
+
     # Preview and confirm
     console.print(
-        f"\n[yellow]Will link {len(selected_paths)} audiobook(s) to {dst_root}[/yellow]"
+        f"\n[yellow]Will link to destination:[/yellow] [cyan]{dst_root}[/cyan]"
     )
     confirm = input("Continue? [y/N]: ").lower()
 
@@ -909,8 +948,8 @@ def search_and_link_wizard():
         zero_pad = bool(config.get("zero_pad", True))
         also_cover = bool(config.get("also_cover", False))
 
-        for path_str in selected_paths:
-            src = Path(path_str)
+        for book in selected_books:
+            src = Path(book["path"])
 
             print(f"\nProcessing: {src.name}")
             plan_and_link_red(src, dst_root, also_cover, zero_pad, False, False, stats)
